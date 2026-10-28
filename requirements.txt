@@ -1,0 +1,6 @@
+torch==2.11.0
+gpytorch==1.15.2
+linear_operator==0.6.1
+numpy==2.4.4
+scipy==1.17.1
+matplotlib==3.10.8
