@@ -12,6 +12,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 from dense_gp import DenseHeatKernel, GraphGP
+from graph_gp import SparseHeatKernel
 
 
 def grid_laplacian(side: int = 6) -> torch.Tensor:
@@ -22,9 +23,11 @@ def grid_laplacian(side: int = 6) -> torch.Tensor:
     grid = sparse.kronsum(path, path, format="coo")
     grid = grid / grid.diagonal().max()
     indices = torch.tensor(np.stack([grid.row, grid.col]), dtype=torch.long)
-    return torch.sparse_coo_tensor(
-        indices, torch.tensor(grid.data), grid.shape, check_invariants=True
-    ).coalesce()
+    # The scoped check also covers the sparse tensor created by coalesce().
+    with torch.sparse.check_sparse_tensor_invariants():
+        return torch.sparse_coo_tensor(
+            indices, torch.tensor(grid.data), grid.shape, check_invariants=True
+        ).coalesce()
 
 
 def main():
@@ -43,7 +46,7 @@ def main():
     train_y = observations[train_ids]
 
     likelihood = gpytorch.likelihoods.GaussianLikelihood().double()
-    likelihood.noise = noise_variance
+    likelihood.noise = torch.tensor(noise_variance, dtype=torch.float64)
     likelihood.raw_noise.requires_grad_(False)
     kernel = DenseHeatKernel(laplacian, heat_time=0.8)
     model = GraphGP(train_ids, train_y, likelihood, kernel)
@@ -64,12 +67,64 @@ def main():
     print(f"Dense negative MLL: {losses[0]:.8f} -> {final_loss.item():.8f} (40 Adam steps)")
     print(f"Fitted heat time: {kernel.heat_time.item():.8f} (allowed interval 0.05 to 4)")
 
+    # Swap only the kernel, then compare at identical fitted parameters.
+    sparse_kernel = SparseHeatKernel(laplacian, heat_time=kernel.heat_time.item())
+    sparse_model = GraphGP(train_ids, train_y, likelihood, sparse_kernel)
+    sparse_mll = gpytorch.mlls.ExactMarginalLogLikelihood(likelihood, sparse_model)
+    rhs = torch.linspace(-1, 1, ids.numel(), dtype=torch.float64)
+    action_error = (kernel(ids) @ rhs - sparse_kernel(ids) @ rhs).abs().max()
+    dense_value = -final_loss
+    dense_gradient, = torch.autograd.grad(dense_value, kernel.raw_heat_time)
+    sparse_value = sparse_mll(sparse_model(train_ids), train_y)
+    sparse_gradient, = torch.autograd.grad(sparse_value, sparse_kernel.raw_heat_time)
+    print(f"Degree 20 covariance action max error: {action_error.item():.3e}")
+    print(f"Cholesky MLL / raw-tau gradient differences: "
+          f"{abs(dense_value.item() - sparse_value.item()):.3e} / "
+          f"{abs(dense_gradient.item() - sparse_gradient.item()):.3e}")
+
+    # Dense iterative versus sparse iterative isolates the representation.
+    # Each is also compared with the direct dense value: SLQ is stochastic.
+    iterative_results = []
+    for current_model, current_mll in [(model, mll), (sparse_model, sparse_mll)]:
+        torch.manual_seed(71)
+        with (
+            gpytorch.settings.max_cholesky_size(0),
+            gpytorch.settings.max_preconditioner_size(0),
+            gpytorch.settings.cg_tolerance(1e-10),
+            gpytorch.settings.num_trace_samples(32),
+            gpytorch.settings.max_lanczos_quadrature_iterations(24),
+        ):
+            value = current_mll(current_model(train_ids), train_y)
+            gradient, = torch.autograd.grad(value, current_model.covar_module.raw_heat_time)
+            iterative_results.append(torch.stack([value.detach(), gradient]))
+    matched_error = (iterative_results[0] - iterative_results[1]).abs()
+    exact_result = torch.stack([dense_value.detach(), dense_gradient])
+    inference_error = (iterative_results[1] - exact_result).abs()
+    print("CG/SLQ: requested tolerance 1e-10, 32 probes, seed 71, 24 Lanczos steps; no preconditioner")
+    print(f"Matched dense/sparse iterative MLL / gradient differences: "
+          f"{matched_error[0]:.3e} / {matched_error[1]:.3e}")
+    print(f"Sparse iterative versus dense direct MLL / gradient errors: "
+          f"{inference_error[0]:.3e} / {inference_error[1]:.3e}")
+
     model.eval()
+    sparse_model.eval()
     likelihood.eval()
     with torch.no_grad():
         prediction = model(test_ids)
         mean = prediction.mean
         std = prediction.variance.sqrt()
+    with (
+        torch.no_grad(),
+        gpytorch.settings.max_cholesky_size(0),
+        gpytorch.settings.max_preconditioner_size(0),
+        gpytorch.settings.max_eager_kernel_size(0),
+        gpytorch.settings.eval_cg_tolerance(1e-10),
+    ):
+        sparse_prediction = sparse_model(test_ids)
+        sparse_mean = sparse_prediction.mean
+        sparse_variance = sparse_prediction.variance
+    print(f"Held-out mean / variance max differences (sparse CG versus dense direct): "
+          f"{(sparse_mean - mean).abs().max():.3e} / {(sparse_variance - std.square()).abs().max():.3e}")
     rmse = (mean - truth[test_ids]).square().mean().sqrt()
     print(f"Held-out latent RMSE: {rmse.item():.8f}")
 
@@ -79,6 +134,7 @@ def main():
     axis.plot(ids, truth, color="0.6", label="Latent draw")
     axis.scatter(train_ids, train_y, s=18, color="black", label="Training observations")
     axis.errorbar(test_ids, mean, yerr=2 * std, fmt="o", label="Dense latent mean ± 2 sd")
+    axis.scatter(test_ids, sparse_mean, marker="x", color="red", label="Sparse CG latent mean")
     axis.set(xlabel="Grid vertex ID (row order)", ylabel="Function value")
     axis.legend(fontsize=8)
     figure.tight_layout()
@@ -86,7 +142,9 @@ def main():
     plt.close(figure)
     np.savez(output / "prediction_inputs.npz", truth=truth.numpy(), observations=observations.numpy(),
              train_ids=train_ids.numpy(), test_ids=test_ids.numpy(), dense_mean=mean.numpy(),
-             dense_variance=std.square().numpy())
+             dense_variance=std.square().numpy(), sparse_mean=sparse_mean.numpy(),
+             sparse_variance=sparse_variance.numpy(), heat_time=kernel.heat_time.item(),
+             noise_variance=noise_variance)
     print(f"Figure and reproducible inputs: {output}")
 
 

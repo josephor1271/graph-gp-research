@@ -29,7 +29,10 @@ class DenseHeatKernel(gpytorch.kernels.Kernel):
         self.register_buffer("eigenvalues", eigenvalues)
         self.register_buffer("eigenvectors", eigenvectors)
         self.register_parameter("raw_heat_time", torch.nn.Parameter(eigenvalues.new_zeros(())))
-        self.register_constraint("raw_heat_time", gpytorch.constraints.Interval(0.05, 4.0))
+        # GPyTorch constructs constraint buffers in the global default dtype;
+        # match the parameter to avoid mixed-precision interval arithmetic.
+        constraint = gpytorch.constraints.Interval(0.05, 4.0).to(dtype=eigenvalues.dtype)
+        self.register_constraint("raw_heat_time", constraint)
         time = eigenvalues.new_tensor(heat_time)
         self.initialize(raw_heat_time=self.raw_heat_time_constraint.inverse_transform(time))
 
