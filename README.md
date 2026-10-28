@@ -31,3 +31,15 @@ tests passed; `demo.py` reduced negative MLL from 0.83903702 to 0.60669030 in
 40 updates, fitted tau=2.85602691, and obtained latent held-out RMSE 0.56974583.
 No tests failed. The first run emitted a Torch sparse-invariant warning; graph
 construction now explicitly enables invariant checks.
+
+`chebyshev.py` computes 128-node cosine-quadrature coefficients with Torch, then
+applies `T_0 V = V`, `T_1 V = (L-I)V`, and
+`T_k V = 2(L-I)T_{k-1}V - T_{k-2}V`. Degree is fixed at 20; gradients pass
+through the coefficients to heat time. No dense graph covariance is needed.
+
+Stage 2: all five tests passed. Actions and heat derivatives at tau=0.05, 0.8,
+2.85602691, and 4 agree with independent SciPy `expm` and its analytic derivative.
+A 17-time × 2,001-point spectral check measured maximum absolute polynomial
+error 2.887e-15 and minimum value 3.355e-4. These are sampled checks, not continuous
+bounds or a general positivity guarantee. No failures; the Torch warning still
+appears despite constructor invariant checks, and has not been filtered.
