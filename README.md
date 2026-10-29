@@ -132,3 +132,33 @@ by speed. A 1e-2/64/24 control reduces MLL errors to -0.01311 to +0.03704 (27 ca
 + gradient only, not scaling claims. Numerical CG warnings remain visible; no
 assertions failed. Baseline: eight tests passed. Figure/data/log are ignored
 `results/cg_residual.png`, `cg_inputs.npz`, `experiment_cg*.txt`. No core files changed.
+
+## Pathwise sampling experiment (October 29, 2026)
+
+Run `.venv/bin/python experiment_pathwise.py`. On an 8x8 grid (22 train, 42 test),
+use the same tau/noise, degree-20 `q(L)` at tau/2, data seed 41, sample seed 42.
+The sample covariance and update consistently use **K_q=q(L)^2**, not p_tau(L).
+Two sparse applications build only 64x22 training columns; one 22x22 Cholesky
+factorization handles all sample RHS. Independent dense spectral/polynomial
+references verify the action and sampling-transform covariance with unchanged
+tight numerical tolerances. Full graph matrices occur only in tiny references
+and data generation. K_q/exact-heat max covariance error is 1.082e-15; analytic
+posterior mean/variance differences are 1.721e-15 / 4.441e-16.
+
+512/1,024 draws give mean RMSE 0.015257/0.008189 and latent variance RMSE
+0.007445/0.005435. At 1,024, mean/variance standardized-error RMS is 0.837/1.121
+(max absolute 1.802/3.747), consistent with sampling noise. Counts share a prefix;
+this is not independent replication. Block setup/factorization took ~0.52 ms,
+and 1,024 draws/actions/conditioning ~3.98 ms in one tiny CPU run. Optional
+CG 1e-2 on the same observed block/RHS achieves mean/max residual 1.36e-5/2.30e-5;
+sample mean/variance changes from Cholesky are at most 4.27e-6/1.37e-7. Its
+unwarmed solve/update took ~20 ms, not a useful speed comparison. No warnings or
+assertion failures. The square-root action avoids per-vertex posterior diagonals;
+training-column construction, dense observed factorization, sample workspace,
+Monte Carlo error, and reliable large-system iterative solves still cost work.
+Neither experiment establishes a GRF kernel comparison or resolves historical
+gradient-sign failures. A moderate CG budget such as 1e-4 with longer SLQ is a
+reasonable next investigation; defaults remain unchanged. Figure/inputs/log are
+`results/pathwise_posterior.png`, `pathwise_inputs.npz`, `experiment_pathwise.txt`.
+Manifest: two scripts and README added/updated; nothing deleted; core code and old
+repository kept unchanged. Stopped after these two experiments.
