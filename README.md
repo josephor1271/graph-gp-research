@@ -162,3 +162,35 @@ reasonable next investigation; defaults remain unchanged. Figure/inputs/log are
 `results/pathwise_posterior.png`, `pathwise_inputs.npz`, `experiment_pathwise.txt`.
 Manifest: two scripts and README added/updated; nothing deleted; core code and old
 repository kept unchanged. Stopped after these two experiments.
+
+## Learning fidelity (after merged PR #1)
+
+Run `.venv/bin/python experiment_learning.py`: exactly the demo draw, CPU float64,
+60 Adam updates at lr=0.08 from 0.8/3.0; sparse CG=1e-4, 64 probes, 24 Lanczos,
+no preconditioner, degree 20, fixed noise variance 0.04, and streams 71–73 seeded
+once per run. Only heat time is learned; every step is audited with independent
+matrix-exponential/Cholesky Gaussian algebra. Eight tests pass before/after;
+experiment numerical checks pass with no warnings, while baseline CG warnings
+remain visible. Figure, all trajectories/training estimates, endpoint table and
+console output are in ignored `results/learning_fidelity.png`, `learning_inputs.npz`,
+and `experiment_learning.txt`; exact predictions are used for every endpoint.
+
+The best profile/dense-endpoint reference is NLL=0.604599300 at tau=2.6706553,
+not the generating tau=1.4 or a certified optimum. Sparse endpoint gaps are at
+most 7.31e-4 per observation, supporting similar learning on this draw; the
+profile is locally shallow, so small tau differences need not imply material
+model differences. Across seeds, tau spans 2.76043–2.78063 from 0.8 and
+2.66539–2.69668 from 3.0, with exact NLL spreads 2.47e-4 and 3.56e-5 respectively.
+Final stochastic estimates understate exact NLL by 0.0060–0.0086 and misrank some
+fits, but the exact audits show only small endpoint differences here. Sparse
+latent RMSE ranges 0.567696–0.568948 versus dense 0.567754/0.568735; exact
+predictions isolate learned-parameter effects, and one draw cannot establish
+generalization performance. Dense from 0.8 remains unconverged (exact dNLL/dtau
+=+0.0110), while dense from 3.0 is nearer stationary (-0.000272), so neither
+complete optimizer agreement nor a definitive success is established. Fixed-tau
+Cholesky values/gradients agree with the independent reference within 3e-16,
+whereas seed-71 iterative raw-gradient errors are 0.0104/0.00388 at 0.8/3.0.
+Measured training time excluding audits is ~0.50–0.55 s sparse and ~0.022–0.024 s
+dense (unwarmed; 60 updates plus final estimate), with no scalability claim.
+Manifest: added one script and updated README; no deletions, core/default changes,
+or scaling experiments. Stopped after this fixed experiment.
