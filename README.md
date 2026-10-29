@@ -107,3 +107,28 @@ read-only. Local `.venv/` and `results/` are ignored; figure inputs include trut
 observations, vertex splits, both posterior moments, fitted heat time, and noise.
 Open limitation: strict CG convergence remains unmet as recorded above; larger
 graphs, other parameter ranges, batching, and devices remain untested.
+
+## CG settings experiment (October 29, 2026)
+
+Run `.venv/bin/python experiment_cg.py`. It reuses the demo draw, degree 20,
+tau=2.85602691 and noise variance 0.04; no refit. The exact/polynomial observed
+condition numbers are 14.797948; covariance max error is 1.110e-15. Single/batched
+default CG stalls near 7.04e-6 / 7.64e-6 mean residual at requests 1e-6 and 1e-10
+(1,001 matvec calls, including initial residual). Requests 1e-2 take 12 calls,
+achieving 9.62e-4 / 1.72e-3; 1e-4 takes 16 calls, achieving 3.79e-5 / 8.55e-5.
+Batch maximum residual at 1e-4 is 1.55e-4: stopping controls the mean. One explicit
+`eps=1e-20` sensitivity check reaches 7.61e-11 / 8.13e-11 in 28/27 calls, supporting
+the default division safeguard as the floor's cause, rather than ill-conditioning.
+
+GRF-code settings were verified at [commit 268fff9](https://github.com/MatthewZhang473/Fast-Graph-GP/blob/268fff9a3724cdd480dce4b2946068d8211b4f30/src/grf_gp/utils/config.py).
+All changes are scoped, with no preconditioner or private mutations. Dense
+negative MLL=0.606690299, d/dtau=+0.022568925, independently checked with matrix-exp
+Gaussian algebra. Seeds 71–73: strict 1e-10/32 probes/24 Lanczos has MLL errors
+-0.00651 to +0.03614 and gradient errors -0.00600 to +0.00385 (~190 ms, 1,002
+recurrence calls); GRF-code 1e-2/64/1 has errors +0.13757 to +0.18322 and -0.00560
+to +0.00572 (~4–5 ms, 13 calls). Signs match in all cases; accuracy is not assured
+by speed. A 1e-2/64/24 control reduces MLL errors to -0.01311 to +0.03704 (27 calls,
+~9 ms). Dense is fastest here (~0.44 ms). Timings are warmed, instrumented forward
++ gradient only, not scaling claims. Numerical CG warnings remain visible; no
+assertions failed. Baseline: eight tests passed. Figure/data/log are ignored
+`results/cg_residual.png`, `cg_inputs.npz`, `experiment_cg*.txt`. No core files changed.
