@@ -194,3 +194,74 @@ Measured training time excluding audits is ~0.50–0.55 s sparse and ~0.022–0.
 dense (unwarmed; 60 updates plus final estimate), with no scalability claim.
 Manifest: added one script and updated README; no deletions, core/default changes,
 or scaling experiments. Stopped after this fixed experiment.
+
+## Scaling crossover (after merged PR #2)
+
+Apple M4, 16 GB RAM, macOS 26.6.2 arm64, Torch 2.11.0/GPyTorch 1.15.2,
+CPU float64, four threads. All arms use AdamW defaults except lr=0.05, 100
+updates, tau start=0.8, amplitude one, zero mean, and noise variance 0.04.
+Data use degree-20 heat-root actions at tau_true=1.4, seed 12+n, split seed 23+n;
+the same latent/noise draw and 64 held-out vertices are used when varying m.
+The block baseline rebuilds its observed covariance in batches of at most 32
+RHS every update. GRF-code means Chebyshev CG=1e-2/64 probes/1 Lanczos; control
+means 1e-4/64/24. Both force iterative inference without preconditioning and
+seed the probe stream once at 71. No GRF kernel was run or core code changed.
+
+Measured **100-update training seconds**, excluding audits and prediction:
+
+| n | m | Dense-exact | Block Cholesky | GRF-code | Control | GRF audited NLL gap | GRF latent RMSE ratio |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| 400 | 128 | 0.084 | 0.895 | 1.804 | 3.674 | -1.06e-6 | 1.000017 |
+| 400 | 256 | 0.161 | 1.849 | 1.913 | — | -1.11e-6 | 1.000037 |
+| 1600 | 128 | — | 3.837 | 6.950 | — | +9.34e-6 | 0.999928 |
+| 1600 | 512 | — | 16.166 | 7.102 | 14.394 | +6.04e-6 | 1.000031 |
+| 3600 | 128 | — | 6.794 | 17.060 | — | +6.48e-5 | 0.999931 |
+| 3600 | 512 | — | 27.217 | 16.141 | — | +6.32e-6 | 0.999997 |
+| 6400 | 128 | — | 11.104 | 28.824 | — | -2.22e-7 | 0.999999 |
+| 6400 | 512 | — | 46.700 | 27.951 | — | +7.53e-6 | 0.999864 |
+| 10000 | 128 | — | — | 58.625 | — | unmatched | unmatched |
+| 10000 | 512 | — | — | 56.633 | — | unmatched | unmatched |
+
+All eight matched GRF-code runs pass the preset gates: polynomial-Cholesky NLL
+gap <=0.02 per observation and latent RMSE ratio <=1.05 against block training.
+Qualified measured crossovers occur at (1600,512), (3600,512), (6400,512):
+training ratios block/GRF=2.276/1.686/1.671; setup-inclusive ratios=2.276/1.686/1.670.
+There is no measured win for m=128 or (400,256); the latter is only 3.5% slower
+and therefore marginal. Control also passes both cases; its 1.123x win at
+(1600,512) is provisional. Dense-exact is fastest at n=400, including setup;
+no full-graph dense crossover was measured. Full dense-exact above 400, control
+outside its two prescribed cases, and block training at 10000 were not scheduled.
+Both 10000 cases are audited but unmatched sparse-only feasibility, not speedups.
+
+Setup includes common graph/data cost charged to each arm, kernel/optimizer
+construction, and one forward/backward warmup without an update. CSV separately
+records setup, warmup, training, their setup+training sum, learned tau, endpoint
+reported/audited NLL, latent RMSE, and prediction time. Audits use independent
+untimed polynomial-block Cholesky; fixed-tau dense/block NLL/raw-gradient errors
+at (400,128) were 1.11e-16/8.33e-17. All sparse predictions use existing GPyTorch
+mean-only CG at tolerance 1e-4; dense predictions use Cholesky. No variance quality
+was checked. GRF reported NLL differs from its audit by up to 0.05843, despite
+passing learned-model gates. These are single-stream, single-timing 100-step
+endpoints, not convergence guarantees, asymptotic laws, or GRF performance results.
+
+Pilot then full schedule completed: 22 rows / 2,200 updates, zero experiment
+warnings, failures, incomplete or pending rows. Existing eight tests pass before
+and after; their previous strict-CG warnings remain visible. Bounded sparse
+products were checked in warmups (maximum width 32 for block, 65 for iterative).
+Generated CSV, figure and console logs stay ignored under `results/`:
+
+```sh
+set -o pipefail
+caffeinate -i .venv/bin/python -u experiment_scaling.py --pilot 2>&1 | tee results/scaling_pilot.txt
+caffeinate -i .venv/bin/python -u experiment_scaling.py 2>&1 | tee results/scaling_run.txt
+.venv/bin/python -m unittest discover -s tests -v
+git diff --check
+```
+
+The script resumes recorded arms without retries and saves `scaling_rows.csv`
+after each arm; the one figure is `scaling_crossover.png`. A 15-minute per-arm
+guard labels incomplete rows and excludes them; it was never reached. Source
+settings: [scaling/AdamW](https://github.com/MatthewZhang473/Graph-Random-Features-for-Scalable-Gaussian-Processes/tree/274b7ee393ee516585552f053e9d4a9c6ad2222f/experiments),
+[iterative defaults](https://github.com/MatthewZhang473/Fast-Graph-GP/blob/268fff9a3724cdd480dce4b2946068d8211b4f30/src/grf_gp/utils/config.py).
+Manifest: added one 214-line script and this finding; no deletions, dependencies,
+core/default changes, or follow-on experiments. Review the PR separately.
