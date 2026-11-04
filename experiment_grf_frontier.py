@@ -41,7 +41,7 @@ class BoundedDiffusionGRFKernel(DiffusionGRFKernel):
 
 def record(rows, row):
     """Replace one checkpoint atomically; completed cells survive interruption."""
-    key = (row["kind"], row["seed"], row["arm"], row["budget"])
+    key = (row["kind"], int(row["seed"]), row["arm"], float(row["budget"]))
     rows[:] = [r for r in rows if (r["kind"], int(r["seed"]), r["arm"], float(r["budget"])) != key]
     rows.append(row)
     fields = list(dict.fromkeys(field for r in rows for field in r))
@@ -254,11 +254,12 @@ def figure(rows):
         baseline = next((r for r in complete if r["arm"] == "Cheb" and
                          int(r["seed"]) == int(row["seed"]) and int(r["budget"]) == int(row["budget"])), None)
         if baseline is not None:
-            for path in ["oracle", "deployed"]:
-                row[f"{path}_matched"] = (float(row[f"{path}_rmse"]) <= 1.02*float(baseline[f"{path}_rmse"]) and
-                                          float(row[f"{path}_nlpd"]) <= float(baseline[f"{path}_nlpd"])+.02)
+            for path in (["oracle", "deployed"] if row["arm"] == "Cheb" else ["oracle", "deployed", "mc101"]):
+                row[f"{path}_matched"] = (float(row[f"{path}_rmse"]) <= 1.02*float(baseline["oracle_rmse"]) and
+                                          float(row[f"{path}_nlpd"]) <= float(baseline["oracle_nlpd"])+.02)
             row["total_ratio_to_cheb"] = float(row["total_s"])/float(baseline["total_s"])
             record(rows, row)
+    complete = [r for r in rows if r["kind"] == "fit" and r["status"] == "complete"]
     fig, axes = plt.subplots(1, 2, figsize=(11, 4))
     labels = set()
     for row in complete:
@@ -283,6 +284,7 @@ def figure(rows):
 def main():
     torch.set_default_dtype(torch.float64)
     torch.set_num_threads(4)
+    assert gpytorch.settings.max_cholesky_size.value() == 800
     print(f"{platform.platform()}, {platform.machine()}, Torch {torch.__version__}, GPyTorch {gpytorch.__version__}; CPU float64, four threads", flush=True)
     print("Prediction CG=1e-4; native Cholesky training threshold=800; MC seeds100/101, 512 draws each. Practical tolerance: RMSE<=1.02*Cheb AND NLPD<=Cheb+.02.")
     for path, commit in [(CORE, CORE_COMMIT), (UPSTREAM, EXPERIMENT_COMMIT)]:
