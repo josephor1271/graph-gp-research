@@ -77,6 +77,7 @@ def prepare():
     assert sha(path.read_bytes()) == manifest["data_sha"]
     with np.load(path) as archive:
         data = dict(archive)
+    assert data["indices"].tolist() == [1, 5, 9] and manifest["split_seed"] == 20261104
     assert sha(data["laplacian"].tobytes()) == str(base["laplacian_hash"])
     print(f"DATA validated: {manifest}", flush=True)
     return data
@@ -139,6 +140,7 @@ def main():
     torch.set_default_dtype(torch.float64)
     torch.set_num_threads(4)
     assert gpytorch.settings.max_cholesky_size.value() == 800
+    assert GRID["C"] == (3, .5, 4096) and GRID["H"] == (10, .1, 4096)
     for path, commit in [(CORE, CORE_COMMIT), (UPSTREAM, EXPERIMENT_COMMIT)]:
         assert subprocess.check_output(["git", "-C", str(path), "rev-parse", "HEAD"], text=True).strip() == commit
     OUT.mkdir(exist_ok=True)
@@ -181,6 +183,7 @@ def main():
             checkpoint = OUT / f"fit_{row['index']}_{arm}_{seed}.pt"
             if checkpoint.exists():
                 state = torch.load(checkpoint, weights_only=True)
+                assert len(state["losses"]) == 1000
                 model.load_state_dict(state["model"])
                 row.update(setup_s=state["setup_s"], train_s=state["train_s"])
             else:
