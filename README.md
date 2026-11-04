@@ -337,3 +337,265 @@ NLPD in original mph units adds log(train_std); native scores remain separate.
 Exact environment/checkout commands and all numerical rows are in the PR.
 Manifest: one script plus README; core implementation and project requirements
 kept unchanged, no deletions or follow-on experiments. Leave review unmerged.
+
+## GRF accuracy–cost frontier on frozen PEMS-BAY splits
+
+H (J=10, halt=0.1, 4096 walks/node) closes the predictive gap on both splits at
+1000 updates, at **69.97 / 75.18 s**, versus Cheb **28.70 / 27.00 s** (seed 0/2):
+**2.44× / 2.78× the cost**. It is the only consistently qualifying bounded-beta
+setting by the primary predictive oracle at that budget. H's oracle RMSE/NLPD is
+15.6266/1.363449 and 14.9092/1.267163; Cheb's is 15.7103/1.366652 and
+14.8323/1.260774. H slightly improves seed 0 and worsens seed 2; no significance
+claim follows. Its fixed-beta=1.9 kernel error remains 12.46% / 13.14%.
+
+At 100 updates G and H qualify by oracle; the cheapest consistent GRF is G at
+8.76 / 9.52 s versus Cheb 3.10 / 2.58 s (2.83× / 3.69×). At 1000, G fails both
+thresholds narrowly on seed 2. The cheapest individually qualifying oracle is G
+on seed 0 (57.26 s, 1.99× Cheb) and B on seed 2 (15.03 s, 0.56×); neither
+consistently qualifies across splits.
+
+**Deployed MC gives a cheaper, sensitive result:** B and C qualify on both splits
+at 1000 updates with sample seed 100. B costs 15.24 / 15.03 s (0.53× / 0.56× Cheb).
+With replication seed 101 only C and H consistently qualify; C costs 15.90 /
+16.02 s (0.55× / 0.59×; costs use seed-100 prediction). B's seed-0 oracle misses
+the RMSE limit by 0.0048 mph; C's misses NLPD by 0.00196. These borderline oracle
+failures and MC gate flips are material uncertainty. At 100 updates only H
+qualifies in both MC replications on both splits. No thresholds/settings changed.
+
+Same PR #4 weighted normalized L, 1016 nodes / 1173 edges / 325 sensors, seeds
+0/2, 250 train / 75 test, train-only normalization. Each arm is one AdamW lr=.05
+fit (default weight decay .01), checkpointed at 100/1000 with optimizer state
+preserved. Primary GRF overrides only beta=2*sigmoid(raw_beta); all other GRF
+code is imported unchanged. Cheb uses degree 20 and observed Cholesky. Raw
+beta/signal/noise starts 1/1/0 give physical 1.462117157/1.313261688/0.693247181
+(last is noise variance) in both. Native keeps softplus beta (initial 1.313261688)
+only at G/seed 0, as labeled context outside matched-frontier selection. No
+prior fitted GRF state was reused; new Cheb states reproduce PR #4.
+
+Gate: RMSE <= 1.02*Cheb **and** normalized marginal observation NLPD <= Cheb+.02,
+separately per split/budget, at full precision. This is descriptive, not an
+equivalence test. O/D/R means oracle / deployed seed 100 / replication seed 101.
+Oracle means exact own-kernel Cholesky; GRF deploys upstream pathwise CG=1e-4,
+512 draws per seed. Cheb deploys its oracle. Training uses native Cholesky
+threshold 800 at m=250. Observation variance adds learned noise **once**; no
+latent or joint NLPD is substituted. NLPD_mph adds log(train_std), where std is
+16.902929904605298 / 17.35662266225777. Test metrics never select a fit/checkpoint.
+
+**1000 updates.** MC entries are RMSE mph / normalized observation NLPD for
+seeds 100;101. J includes power zero for GRF. Total = walk + model/optimizer setup
++ cumulative training + one deployed prediction. It excludes data preparation,
+dense audits, checkpoint I/O and replication 101. Cached walks are charged at
+original measured cost once per standalone checkpoint, including native G.
+
+| Seed | Arm | J | Halt | W | Beta | Oracle RMSE | Oracle NLPD | Deployed MC (100; 101) | Train s | Total s | O/D/R |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- | ---: | ---: | --- |
+| 0 | Cheb | degree 20 | — | — | 1.995168 | 15.7103 | 1.366652 | Cholesky | 28.38 | 28.70 | baseline |
+| 0 | A | 3 | 0.5 | 256 | 0.993908 | 16.8283 | 1.416443 | 16.7665/1.413152; 16.7527/1.411567 | 13.96 | 14.62 | N/N/N |
+| 0 | B | 3 | 0.5 | 1024 | 1.366774 | 16.0293 | 1.373958 | 15.9782/1.368456; 15.9511/1.369086 | 14.59 | 15.24 | N/Y/Y |
+| 0 | C | 3 | 0.5 | 4096 | 1.498688 | 15.8379 | 1.388607 | 15.7755/1.384951; 15.7668/1.383355 | 13.72 | 15.90 | N/Y/Y |
+| 0 | D | 10 | 0.5 | 256 | 0.826383 | 16.7860 | 1.410680 | 16.7156/1.407597; 16.6961/1.405940 | 37.94 | 38.55 | N/N/N |
+| 0 | E | 10 | 0.5 | 1024 | 1.242162 | 16.4571 | 1.392973 | 16.4269/1.391674; 16.3800/1.388705 | 40.87 | 41.98 | N/N/N |
+| 0 | F | 10 | 0.1 | 256 | 1.553682 | 16.2635 | 1.418792 | 16.2249/1.418161; 16.1959/1.415566 | 52.97 | 54.36 | N/N/N |
+| 0 | G | 10 | 0.1 | 1024 | 1.990765 | 15.8286 | 1.376225 | 15.7982/1.375521; 15.7622/1.371908 | 53.89 | 57.26 | Y/Y/Y |
+| 0 | H | 10 | 0.1 | 4096 | 1.995508 | 15.6266 | 1.363449 | 15.6033/1.363035; 15.5647/1.359858 | 57.57 | 69.97 | Y/Y/Y |
+| 0 | native | 10 | 0.1 | 1024 | 2.130473 | 15.7972 | 1.376975 | 15.7692/1.376224; 15.7330/1.372337 | 60.60 | 64.07 | Y/Y/Y |
+| 2 | Cheb | degree 20 | — | — | 1.994967 | 14.8323 | 1.260774 | Cholesky | 26.98 | 27.00 | baseline |
+| 2 | A | 3 | 0.5 | 256 | 0.918940 | 15.3373 | 1.294140 | 15.3802/1.295475; 15.3912/1.301325 | 13.15 | 13.46 | N/N/N |
+| 2 | B | 3 | 0.5 | 1024 | 1.359263 | 14.9690 | 1.276010 | 15.0127/1.275584; 15.0209/1.282725 | 14.34 | 15.03 | Y/Y/N |
+| 2 | C | 3 | 0.5 | 4096 | 1.453515 | 14.9556 | 1.272092 | 14.9926/1.271699; 15.0051/1.278716 | 13.83 | 16.02 | Y/Y/Y |
+| 2 | D | 10 | 0.5 | 256 | 0.815142 | 15.5316 | 1.309360 | 15.5645/1.311571; 15.5764/1.315840 | 37.49 | 38.12 | N/N/N |
+| 2 | E | 10 | 0.5 | 1024 | 1.620250 | 15.1388 | 1.290821 | 15.1804/1.292668; 15.1791/1.294825 | 43.26 | 44.40 | N/N/N |
+| 2 | F | 10 | 0.1 | 256 | 1.309213 | 15.4015 | 1.310455 | 15.4252/1.312623; 15.4451/1.314351 | 52.95 | 54.39 | N/N/N |
+| 2 | G | 10 | 0.1 | 1024 | 1.777601 | 15.1501 | 1.281844 | 15.1795/1.284334; 15.2025/1.285426 | 56.89 | 60.45 | N/N/N |
+| 2 | H | 10 | 0.1 | 4096 | 1.995407 | 14.9092 | 1.267163 | 14.9493/1.269090; 14.9684/1.271352 | 62.19 | 75.18 | Y/Y/Y |
+
+**100 updates of the same fits.** Additional training helps some held-out scores
+and worsens others; compare both fixed checkpoints without selecting one.
+
+| Seed | Arm | Beta | Oracle RMSE/NLPD | Deployed MC (100; 101) | Train s | Total s | O/D/R |
+| --- | --- | ---: | --- | --- | ---: | ---: | --- |
+| 0 | Cheb | 1.938369 | 15.7566/1.368571 | Cholesky | 2.77 | 3.10 | baseline |
+| 0 | A | 1.062073 | 16.8652/1.419324 | 16.8072/1.416191; 16.7954/1.414526 | 1.38 | 2.05 | N/N/N |
+| 0 | B | 1.413039 | 16.2570/1.387853 | 16.2156/1.383799; 16.1859/1.382508 | 1.48 | 2.13 | N/N/N |
+| 0 | C | 1.527222 | 16.0412/1.397486 | 15.9863/1.394300; 15.9725/1.391866 | 1.39 | 3.56 | N/N/N |
+| 0 | D | 0.873889 | 16.7878/1.411574 | 16.7207/1.408656; 16.7017/1.406786 | 3.78 | 4.39 | N/N/N |
+| 0 | E | 1.255154 | 16.4578/1.393124 | 16.4286/1.391884; 16.3816/1.388827 | 4.12 | 5.23 | N/N/N |
+| 0 | F | 1.563778 | 16.2699/1.418736 | 16.2317/1.418099; 16.2028/1.415489 | 5.27 | 6.66 | N/N/N |
+| 0 | G | 1.922472 | 15.8579/1.376560 | 15.8263/1.375853; 15.7906/1.372387 | 5.35 | 8.76 | Y/Y/Y |
+| 0 | H | 1.944227 | 15.6670/1.364710 | 15.6421/1.364245; 15.6037/1.361175 | 5.71 | 18.10 | Y/Y/Y |
+| 0 | native | 2.126108 | 15.8000/1.376925 | 15.7720/1.376174; 15.7358/1.372300 | 5.39 | 8.81 | Y/Y/Y |
+| 2 | Cheb | 1.935924 | 14.8653/1.263113 | Cholesky | 2.56 | 2.58 | baseline |
+| 2 | A | 0.996838 | 15.4277/1.300039 | 15.4687/1.302068; 15.4813/1.306171 | 1.32 | 1.61 | N/N/N |
+| 2 | B | 1.370568 | 15.1228/1.286055 | 15.1650/1.286449; 15.1721/1.292130 | 1.42 | 2.12 | N/N/N |
+| 2 | C | 1.454878 | 15.1270/1.284692 | 15.1629/1.285159; 15.1764/1.290586 | 1.36 | 3.56 | N/N/N |
+| 2 | D | 0.913368 | 15.5415/1.309971 | 15.5722/1.312260; 15.5864/1.315658 | 3.65 | 4.25 | N/N/N |
+| 2 | E | 1.618794 | 15.1386/1.290909 | 15.1803/1.292752; 15.1790/1.294917 | 4.35 | 5.50 | N/N/N |
+| 2 | F | 1.311040 | 15.4034/1.310608 | 15.4271/1.312775; 15.4469/1.314490 | 4.97 | 6.39 | N/N/N |
+| 2 | G | 1.763181 | 15.1562/1.282373 | 15.1856/1.284841; 15.2086/1.285977 | 5.86 | 9.52 | Y/N/N |
+| 2 | H | 1.940075 | 14.9339/1.268815 | 14.9732/1.270720; 14.9926/1.273019 | 6.79 | 19.82 | Y/Y/Y |
+
+**Fixed-beta errors, signal variance 1.** Same 325-sensor block (permuted between
+splits). T=||Ktrunc-Kheat||F/||Kheat||F is common to both splits;
+S=||Kgrf-Ktrunc||F/||Ktrunc||F; E=||Kgrf-Kheat||F/||Kheat||F. Paired entries are
+seed 0 / seed 2; diagonal diagnostics are maximum absolute differences.
+These errors are not additive. At finite W, E[Phi Phi^T] need not equal
+(E Phi)(E Phi)^T; no unbiased-covariance claim is made.
+
+| Arm | Beta | T (both splits) | S (0/2) | E (0/2) | Max diag vs heat (0/2) | Max diag vs trunc (0/2) | Max abs Kgrf (0/2) |
+| --- | ---: | ---: | --- | --- | --- | --- | --- |
+| A | 1.0 | 0.096611 | 0.234694 / 0.21841 | 0.280286 / 0.26334 | 0.534161 / 0.439279 | 0.479971 / 0.383445 | 1.08314 / 0.997663 |
+| A | 1.9 | 0.770209 | 0.624322 / 0.548993 | 1.39175 / 1.28492 | 2.40965 / 1.75277 | 2.04113 / 1.37063 | 2.88509 / 2.24492 |
+| B | 1.0 | 0.096611 | 0.115055 / 0.106105 | 0.160209 / 0.154484 | 0.21593 / 0.185739 | 0.176263 / 0.141666 | 0.774821 / 0.693742 |
+| B | 1.9 | 0.770209 | 0.268998 / 0.254891 | 0.921846 / 0.915004 | 0.970567 / 0.866795 | 0.670901 / 0.564442 | 1.36629 / 1.26339 |
+| C | 1.0 | 0.096611 | 0.0585548 / 0.0575435 | 0.116952 / 0.116206 | 0.139797 / 0.159574 | 0.08778 / 0.104053 | 0.702249 / 0.716017 |
+| C | 1.9 | 0.770209 | 0.145624 / 0.135184 | 0.822671 / 0.812693 | 0.660692 / 0.647995 | 0.282017 / 0.269783 | 1.16087 / 1.13617 |
+| D | 1.0 | 1.19006e-07 | 0.265023 / 0.224952 | 0.265023 / 0.224952 | 0.571488 / 0.350905 | 0.571488 / 0.350905 | 1.12046 / 0.881443 |
+| D | 1.9 | 3.52405e-05 | 1.31004 / 1.10654 | 1.31001 / 1.10651 | 2.86212 / 2.3625 | 2.86214 / 2.36252 | 3.33757 / 2.84524 |
+| E | 1.0 | 1.19006e-07 | 0.130063 / 0.121411 | 0.130063 / 0.121411 | 0.194621 / 0.17443 | 0.194621 / 0.17443 | 0.705987 / 0.706203 |
+| E | 1.9 | 3.52405e-05 | 0.549683 / 0.523276 | 0.549669 / 0.523261 | 0.924822 / 0.933173 | 0.92483 / 0.93318 | 1.3728 / 1.35588 |
+| F | 1.0 | 1.19006e-07 | 0.151839 / 0.172523 | 0.151838 / 0.172523 | 0.296446 / 0.377706 | 0.296446 / 0.377706 | 0.833212 / 0.921811 |
+| F | 1.9 | 3.52405e-05 | 0.505419 / 0.599708 | 0.505405 / 0.599693 | 0.716624 / 1.49927 | 0.716643 / 1.49929 | 1.20039 / 1.96177 |
+| G | 1.0 | 1.19006e-07 | 0.0732668 / 0.0811104 | 0.0732668 / 0.0811104 | 0.122264 / 0.147806 | 0.122264 / 0.147806 | 0.65846 / 0.695444 |
+| G | 1.9 | 3.52405e-05 | 0.250789 / 0.26733 | 0.250784 / 0.267323 | 0.390032 / 0.413883 | 0.390046 / 0.4139 | 0.81704 / 0.876384 |
+| H | 1.0 | 1.19006e-07 | 0.0395144 / 0.0407103 | 0.0395144 / 0.0407103 | 0.0653002 / 0.0597879 | 0.0653001 / 0.0597878 | 0.599045 / 0.609401 |
+| H | 1.9 | 3.52405e-05 | 0.124553 / 0.131433 | 0.124551 / 0.131429 | 0.242752 / 0.205508 | 0.242733 / 0.205523 | 0.629863 / 0.655588 |
+
+More walks reduce realized J=3 sampling error, but leave the deterministic
+truncation floor: T=0.770209 at beta=1.9, versus 0.00003524 for J=10. For seed 0,
+A→C reduces S=.62432→.14562 while E remains .82267. Increasing J alone B→E
+reduces truncation but increases S=.26900→.54968; 1000-step predictive quality
+worsens on both splits. At fixed J,W, E→G reduces S=.54968→.25079 while sampling
+cost rises .633→2.651 s; changing halt leaves the deterministic target unchanged.
+F→G→H further reduces S with W on both seeds. These are realized comparisons,
+not a sampling-distribution estimate or monotonicity theorem.
+
+Kernel fidelity, fitted hyperparameters and posterior MC error are separated,
+but do not identify a single cause of held-out improvement. J=3 partly
+compensates using other hyperparameters; H retains kernel error while improving
+seed 0. Native G reaches beta=2.130473, oracle 15.7972/1.376975 in 64.07 s;
+its different parameter domain does not establish a matched-parameter win.
+
+<details>
+<summary>Complete checkpoint audits and runtime components (CSV)</summary>
+
+Columns omitted from primary tables: sigma_f is std, noise is variance; latent
+and observation variances/moment errors use normalized units. MC errors are
+moment RMSEs against the own-kernel oracle. Oracle time is an excluded GRF audit
+and the included Cheb prediction; MC101 time is excluded. Six significant digits
+are shown; local CSV preserves full precision, statuses and all gate flags.
+
+```csv
+seed,arm,updates,sigma_f,noise,kernel_nll,latent_var_min,latent_var_mean,latent_var_max,observation_var_mean,walk_s,setup_s,pred_s,mc101_s,oracle_s,mc100_mean_error,mc100_variance_error,mc101_mean_error,mc101_variance_error,oracle_nlpd_mph,deployed_nlpd_mph
+0,Cheb,100,1.38218,0.317172,1.37676,0.284749,0.549727,0.957627,0.866898,0,0.308752,0.018513,,0.018513,,,,,4.19606,4.19606
+0,Cheb,1000,1.39088,0.31744,1.37594,0.275101,0.545954,0.966939,0.863394,0,0.308752,0.0182886,,0.0182886,,,,,4.19414,4.19414
+0,A,100,1.04698,0.404425,1.40436,0.324065,0.58506,0.987578,0.989485,0.174263,0.333456,0.165341,0.138081,0.0142698,0.038523,0.041366,0.0322491,0.0312034,4.24681,4.24368
+0,A,1000,1.09963,0.339783,1.40424,0.384338,0.648773,1.05351,0.988556,0.174263,0.333456,0.151799,0.126572,0.0137719,0.0405349,0.0454914,0.0341395,0.0345015,4.24393,4.24064
+0,B,100,1.22761,0.192157,1.3883,0.413631,0.72218,1.18352,0.914337,0.503008,0.000296375,0.145714,0.148059,0.0163057,0.0422779,0.0510696,0.0357505,0.0386951,4.21534,4.21129
+0,B,1000,1.3625,0.0237153,1.38575,0.51615,0.872325,1.4183,0.896041,0.503008,0.000296375,0.14184,0.13796,0.0135833,0.0462256,0.0614392,0.0395101,0.0472435,4.20144,4.19594
+0,C,100,1.2524,0.131552,1.37609,0.400205,0.770242,1.22444,0.901794,2.03422,0.000303166,0.143994,0.144109,0.0154455,0.0436134,0.0532504,0.0368706,0.0437667,4.22497,4.22179
+0,C,1000,1.34298,0.00950074,1.37191,0.463023,0.870962,1.38224,0.880463,2.03422,0.000303166,0.144395,0.160008,0.0151765,0.0461122,0.0600097,0.0392999,0.0494769,4.21609,4.21244
+0,D,100,1.10479,0.358274,1.40484,0.32012,0.618585,0.951076,0.976859,0.1872,0.000351959,0.430896,0.45991,0.0423108,0.039229,0.0426916,0.0337384,0.0319383,4.23906,4.23614
+0,D,1000,1.13887,0.3032,1.40477,0.355913,0.672815,1.00499,0.976015,0.1872,0.000351959,0.424691,0.472837,0.0446506,0.0409638,0.0462843,0.0353577,0.0348271,4.23817,4.23508
+0,E,100,1.20347,0.344984,1.39554,0.221072,0.550636,0.956546,0.89562,0.633126,0.000343292,0.477903,0.495094,0.0471855,0.0359063,0.0392755,0.0309882,0.0268725,4.22061,4.21937
+0,E,1000,1.21121,0.334805,1.39554,0.224968,0.56065,0.966137,0.895454,0.633126,0.000343292,0.483106,0.509474,0.0531129,0.0362423,0.0399072,0.0313063,0.027388,4.22046,4.21916
+0,F,100,1.26427,0.342876,1.38444,0.162013,0.560545,1.03504,0.903421,0.765099,0.000302083,0.620631,0.626466,0.0608687,0.0337041,0.0399508,0.0303675,0.0279118,4.24622,4.24559
+0,F,1000,1.26869,0.335635,1.38444,0.164111,0.565505,1.04197,0.901141,0.765099,0.000302083,0.623858,0.624251,0.0582525,0.0338808,0.0402755,0.0305404,0.0281678,4.24628,4.24565
+0,G,100,1.38779,0.306283,1.37688,0.15143,0.549425,1.15964,0.855708,2.65132,0.000255,0.756707,0.746306,0.0642629,0.0322892,0.0391328,0.0299952,0.0254191,4.20405,4.20334
+0,G,1000,1.39557,0.309451,1.37636,0.137463,0.54396,1.20466,0.853411,2.65132,0.000255,0.715533,0.732557,0.0624034,0.0318405,0.0390482,0.0297235,0.0250432,4.20371,4.20301
+0,H,100,1.4292,0.275575,1.3723,0.187563,0.582601,1.1174,0.858177,11.6272,0.000313333,0.761559,0.764571,0.0692412,0.034679,0.0423272,0.0313204,0.0288441,4.1922,4.19173
+0,H,1000,1.43755,0.276032,1.37142,0.176795,0.57965,1.12625,0.855683,11.6272,0.000313333,0.775165,0.758106,0.0706081,0.0344811,0.0422877,0.031183,0.0287799,4.19094,4.19052
+0,native,100,1.40496,0.322243,1.3759,0.113121,0.532336,1.30215,0.85458,2.65132,0.000261584,0.773011,0.797701,0.0672038,0.0309211,0.0389322,0.0291612,0.0242552,4.20441,4.20366
+0,native,1000,1.40571,0.321502,1.37589,0.112117,0.532212,1.30659,0.853714,2.65132,0.000261584,0.81106,0.858029,0.0696102,0.0308961,0.0389549,0.0291503,0.0242446,4.20446,4.20371
+2,Cheb,100,1.33902,0.363079,1.37613,0.267451,0.579802,0.890387,0.942882,0,0.00102004,0.0201155,,0.0201155,,,,,4.11709,4.11709
+2,Cheb,1000,1.34734,0.363921,1.37531,0.256971,0.577293,0.898464,0.941214,0,0.00102004,0.0196354,,0.0196354,,,,,4.11475,4.11475
+2,A,100,1.20103,0.219032,1.39196,0.483424,0.781531,1.29983,1.00056,0.15671,0.000401709,0.134894,0.131556,0.0161917,0.0410541,0.047706,0.0343769,0.0500786,4.15401,4.15604
+2,A,1000,1.33718,0.0244415,1.3895,0.600401,0.978225,1.56696,1.00267,0.15671,0.000401709,0.153833,0.13318,0.0139133,0.045959,0.0602695,0.0384991,0.0624077,4.14811,4.14945
+2,B,100,1.26001,0.162281,1.38139,0.393307,0.809162,1.23506,0.971443,0.558285,0.000352792,0.139466,0.13653,0.0142423,0.0412725,0.0498883,0.0349734,0.0527602,4.14003,4.14042
+2,B,1000,1.37403,0.0169241,1.37841,0.46971,0.955446,1.4605,0.97237,0.558285,0.000352792,0.133675,0.136056,0.0155969,0.0447372,0.0597712,0.0380065,0.062067,4.12998,4.12956
+2,C,100,1.25265,0.166307,1.38367,0.434163,0.784816,1.19446,0.951122,2.06607,0.000300667,0.133862,0.132161,0.014687,0.0407818,0.0475275,0.035302,0.049207,4.13867,4.13913
+2,C,1000,1.36712,0.0170061,1.3807,0.512969,0.929087,1.42183,0.946093,2.06607,0.000300667,0.126204,0.13122,0.0149415,0.0443186,0.0570056,0.0383914,0.0579467,4.12607,4.12567
+2,D,100,1.20962,0.256206,1.39497,0.4449,0.741422,1.13017,0.997629,0.167269,0.000317542,0.430516,0.413847,0.0421889,0.0393027,0.0447949,0.0330823,0.0461947,4.16394,4.16623
+2,D,1000,1.27206,0.133952,1.39463,0.546324,0.859464,1.23361,0.993416,0.167269,0.000317542,0.463824,0.467294,0.0471099,0.0427647,0.0517169,0.0357504,0.053824,4.16333,4.16555
+2,E,100,1.23943,0.386684,1.38151,0.157576,0.579612,1.59794,0.966297,0.648122,0.000326709,0.503456,0.628786,0.0502251,0.0324666,0.0340314,0.0280143,0.0363647,4.14488,4.14673
+2,E,1000,1.2381,0.386838,1.38151,0.156699,0.578231,1.59651,0.965069,0.648122,0.000326709,0.496673,0.475589,0.0491038,0.0324238,0.033957,0.0279794,0.0362818,4.1448,4.14664
+2,F,100,1.18937,0.375251,1.39459,0.219851,0.579254,1.12257,0.954505,0.821871,0.0003205,0.596072,0.592455,0.0620145,0.0339061,0.0327521,0.0284269,0.0368767,4.16458,4.16675
+2,F,1000,1.19174,0.372759,1.39459,0.220729,0.581857,1.12682,0.954616,0.821871,0.0003205,0.61721,0.713567,0.063304,0.0339865,0.0328975,0.0284918,0.03704,4.16443,4.1666
+2,G,100,1.26748,0.40375,1.39105,0.236896,0.559727,1.04941,0.963477,2.86966,0.000323416,0.788621,0.688719,0.0645037,0.0325577,0.0329961,0.0284264,0.0331855,4.13635,4.13882
+2,G,1000,1.26951,0.403261,1.39105,0.233154,0.559268,1.05927,0.962529,2.86966,0.000323416,0.691162,0.675848,0.0655434,0.0325042,0.0330368,0.0284092,0.0331601,4.13582,4.13831
+2,H,100,1.33078,0.365927,1.37717,0.284109,0.572929,1.16643,0.938855,12.3005,0.000358875,0.726258,0.770414,0.0677753,0.032384,0.0330121,0.0286499,0.0348787,4.12279,4.12469
+2,H,1000,1.3391,0.365792,1.37632,0.275764,0.571587,1.19957,0.937379,12.3005,0.000358875,0.691999,0.71387,0.0688924,0.0322076,0.0331198,0.0285737,0.0349309,4.12114,4.12306
+```
+</details>
+
+All 19 fits / 19,000 updates / 38 checkpoints and 32 approximation rows completed;
+no failed or pending scientific case. J=3 polynomial/power indexing and initial
+sampled discrepancy reproduce PR #4; A walks are bit-identical for both seeds.
+Cheb/matrix_exp block relative errors are 7.55e-16 / 1.18e-15 at beta 1.0/1.9;
+small/real-graph NLL, action and raw beta/signal/noise gradients agree around
+1e-15 or better. Independent GPyTorch Cholesky conditioning checks all 38 states:
+max NLL/NLPD/mean-variance error 2.22e-16, RMSE 1.78e-15. Optimizer counts/loss
+prefixes, timing sums and all unrounded gates pass. A resume skips all 19 fits,
+with unchanged fit rows and checkpoint/walk mtimes. Eight tests pass before
+changes and afterward in both environments; known strict-CG warnings remain.
+
+Post-run CSV string-key duplication and a replication-score figure lookup error
+were fixed before reporting, without repeating a fit/sample; canonical CSV has
+70 unique complete rows. Sparse CSR/invariant and upstream deprecation warnings
+remain in logs. No experiment convergence, covariance or memory failure occurred.
+Peak memory was not measured; single sequential timings have no replication
+error bars. Only two joint data/walk seeds, no independent walk replicates,
+GeneralGRF, temporal models, GPU work or scaling were tested.
+
+Apple M4, 16 GiB, 10 logical CPUs, macOS 26.6.2; CPU float64, four Torch threads,
+four sampler workers, effective base seeds 42/2 (0→42 upstream). Python 3.12.0;
+Torch 2.11.0, GPyTorch 1.15.2, linear_operator .6.1, NumPy 1.26.4, SciPy 1.17.1,
+Matplotlib 3.10.8, OSMnx 1.9.4, Shapely 2.0.7, pandas 2.2.3, NetworkX 3.3,
+GeoPandas .14.4, pyproj 3.8.0, tables 3.11.1. Existing environment reused.
+
+Pinned [traffic code 274b7ee](https://github.com/MatthewZhang473/Graph-Random-Features-for-Scalable-Gaussian-Processes/tree/274b7ee393ee516585552f053e9d4a9c6ad2222f)
+and [GRF core 268fff9](https://github.com/MatthewZhang473/Fast-Graph-GP/tree/268fff9a3724cdd480dce4b2946068d8211b4f30)
+are unchanged. Core declares MIT; local changes are the tiny beta adapter and
+attributed checkpointable equivalent of `experiments.utils.train_model`.
+The notebook uses J=3/halt=.5. The work order identifies J=10/halt=.1 in final
+[paper Appendix C.5](https://openreview.net/pdf?id=89SQfLguNn), with C.4 being CG.
+OpenReview access was blocked (verification/403). The accessible
+[preprint](https://arxiv.org/abs/2509.03691) confirms those traffic settings under
+older numbering C.4 and five seeds. Agreement with the paper's plotted figure
+remains **unverified**; this is a controlled two-split subset.
+
+Adjacency SHA256 `96026f51a092dac8461388374081628aa1e85349a33214dbcd51cb88ae156a64`
+and L SHA256 `64661f4a768224ebcf799bfee713dce1402b36febec7d6236b94625c3548671e`
+are unchanged. Separate split/target fingerprints are checked; mismatch stops
+execution. No substitute roads or silent snapshot regeneration.
+
+From the existing pinned PR #4 setup ([fresh installation commands](https://github.com/josephor1271/graph-gp-research/pull/4)),
+explicitly prepare snapshots only if absent, then pilot, full/resume, tests and
+figure generation:
+
+```sh
+mkdir -p results/traffic
+results/traffic_env/bin/python - <<'PYDATA'
+from experiment_grf_traffic import load_data
+for seed in [0, 2]:
+    load_data(seed)
+PYDATA
+caffeinate -i results/traffic_env/bin/python -u experiment_grf_frontier.py --pilot > results/traffic/frontier_pilot.log 2>&1
+caffeinate -i results/traffic_env/bin/python -u experiment_grf_frontier.py > results/traffic/frontier_full.log 2>&1
+results/traffic_env/bin/python -m unittest discover -s tests -v
+.venv/bin/python -m unittest discover -s tests -v
+results/traffic_env/bin/python experiment_grf_frontier.py --figure-only
+git diff --check
+```
+
+The full command resumes without repeating finished fits; preserve earlier logs
+when rerunning. One two-panel `results/traffic/grf_frontier.png` plots oracle
+NLPD/RMSE against total cost; colors mark Cheb/J3/J10/native, markers mark splits,
+hollow/filled marks 100/1000. No lines join splits. As specified, plots/data stay
+ignored and local; numerical tables appear here and in the PR. Walk parameters,
+raw tensors, both optimizer/model checkpoints, losses, environment freeze and
+pilot/full/resume/audit/test logs remain under `results/traffic/`.
+
+Manifest: added one script and this README evidence; deleted nothing. Core GP,
+historical experiments, requirements, upstream sources and old toolbox unchanged.
+No pending runs. Limitations: two joint seeds, MC-sensitive gates, unverified paper
+figure, no peak-memory measurement. Leave the PR open and stop this experiment.
