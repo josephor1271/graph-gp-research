@@ -265,3 +265,75 @@ settings: [scaling/AdamW](https://github.com/MatthewZhang473/Graph-Random-Featur
 [iterative defaults](https://github.com/MatthewZhang473/Fast-Graph-GP/blob/268fff9a3724cdd480dce4b2946068d8211b4f30/src/grf_gp/utils/config.py).
 Manifest: added one 214-line script and this finding; no deletions, dependencies,
 core/default changes, or follow-on experiments. Review the PR separately.
+
+## Official GRF / PEMS-BAY comparison
+
+`experiment_grf_traffic.py` reuses the pinned official preprocessing, sampler,
+training and native evaluator. The bundled cached road graph gives 1,016 nodes,
+1,173 edges and 325 sensors; seeds 0/2 use 250 train / 75 test, with training-only
+normalization and identical weighted symmetric normalized L in every arm.
+Both snapshots have adjacency SHA256
+`96026f51a092dac8461388374081628aa1e85349a33214dbcd51cb88ae156a64`.
+Sources: [traffic notebook/preprocessing, 274b7ee](https://github.com/MatthewZhang473/Graph-Random-Features-for-Scalable-Gaussian-Processes/tree/274b7ee393ee516585552f053e9d4a9c6ad2222f/experiments/regression/traffic_prediction),
+[GRF core, 268fff9](https://github.com/MatthewZhang473/Fast-Graph-GP/tree/268fff9a3724cdd480dce4b2946068d8211b4f30).
+No upstream source edits, live road-network substitution, or core GP changes.
+
+One frozen walk budget: 256/node, cutoff 3 (powers 0–2), halt 0.5, four sampler
+processes. Native diffusion uses AdamW lr .05 / 1000 updates; exact traffic heat
+uses 100 updates. The notebook does not call the scaling-default configuration:
+installed defaults train these 250-point native models with Cholesky (threshold
+800); pathwise prediction uses CG tolerance 1. The upstream sampler maps seed 0
+to effective base seed 42; this behavior was preserved. The downloaded arXiv
+appendix instead describes halt 0.1, cutoff 10 and five seeds: this is a pinned
+**official-code reproduction**, not verified reproduction of the paper's figures.
+
+Heat models learn beta, signal standard deviation and noise variance, with beta
+in (0,2) and raw parameterization/physical starts aligned with traffic exact.
+GRF M100 aligns physical starts but retains upstream's unbounded softplus beta;
+GRF-vs-heat results are complete-model comparisons, not pure approximation tests.
+P denotes original code training; M denotes aligned physical starts. CPU float64,
+four Torch threads, Apple M4. Values below are **seed 0 / seed 2**:
+
+| Method | Updates | Training seconds | RMSE (mph) | Common marginal observation NLPD (normalized) |
+| --- | ---: | ---: | ---: | ---: |
+| GRF P1000 | 1000 | 14.85 / 16.91 | 16.7596 / 15.3858 | 1.41236 / 1.29841 |
+| Exact P100 | 100 | 40.86 / 41.98 | 15.7566 / 14.8653 | 1.36857 / 1.26311 |
+| Cheb M100, Cholesky | 100 | 3.50 / 3.44 | 15.7566 / 14.8653 | 1.36857 / 1.26311 |
+| GRF M100 | 100 | 1.72 / 1.74 | 16.7960 / 15.4736 | 1.41498 / 1.30411 |
+| Cheb CG100 | 100 | 14.42 / 13.73 | 15.7614 / 14.8610 | 1.36882 / 1.26396 |
+| Cheb M1000, Cholesky | 1000 | 29.82 / 34.15 | 15.7103 / 14.8323 | 1.36665 / 1.26077 |
+
+GRF common metrics average two 512-sample evaluations (seeds 100/101), adding
+learned observation noise; source 64-sample latent NLPD is retained separately.
+Its original evaluator also computes its reported LML on a training posterior,
+not the prior observed-data likelihood. Independent block-Cholesky NLL and
+posterior mean/latent variances are reported for every fitted model; GRF's own
+Phi posterior is the MC oracle. Common CG tolerance 1e-4 gives identical draws
+to native tolerance 1 with the same perturbations here, not a general guarantee.
+Cheb CG training uses 1e-4/64 probes/24 Lanczos and Cholesky evaluation; it is
+slower than Cholesky at m=250, with audited NLL differing from its estimate by
+0.00231/0.00125. Cholesky-trained Chebyshev is not matrix-free inference.
+
+At fixed beta=1.462117 and sigma_f=1.313262, Chebyshev block/action errors are
+about 1e-15 and NLL/three raw-gradient errors about 1e-16. Cutoff-3 q2(L)^2 versus
+heat has relative observed-block error 0.291/0.293; sampled GRF versus q2(L)^2
+has error 0.430/0.394. These are separate Frobenius errors, not additive bounds.
+The heat fits improve RMSE/NLPD on these two splits, while matched-budget GRF
+is cheaper; no general GRF superiority claim, GeneralGRF baseline, or scalability
+claim follows. The exact source recomputes matrix_exp per step; no optimized
+eigendecomposition timing baseline was run. Per-arm peak memory was not measured.
+
+All 12 fits / 4,800 updates completed; no long run is pending. Eight existing
+tests pass in both environments. An initial NumPy/OSMnx dependency conflict was
+resolved using an isolated NumPy 1.26.4 environment; a local scalar-initialization
+TypeError was fixed before numerical checks. Upstream Shapely/CSR/deprecation
+and GPInput warnings remain visible; no numerical check failed after that fix.
+Generated snapshots, states, logs, environment freeze, the one `traffic_rows.csv`
+and `grf_traffic.png` stay under ignored `results/traffic/`. The figure plots
+method-specific total seconds (walks/setup/train/author+common evaluation),
+excluding shared preprocessing and validation; CSV `total_s` also includes the
+recorded shared snapshot preparation. Audits are separately timed and excluded.
+NLPD in original mph units adds log(train_std); native scores remain separate.
+Exact environment/checkout commands and all numerical rows are in the PR.
+Manifest: one script plus README; core implementation and project requirements
+kept unchanged, no deletions or follow-on experiments. Leave review unmerged.
