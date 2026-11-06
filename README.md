@@ -657,6 +657,42 @@ PR merges or pending runs. Earlier experiments and old toolbox remain unchanged.
 
 ## Independently tuned numerical and predictive frontiers
 
+All 54 frozen fresh-data fits completed through 50K vertices, plus four separately
+labelled timing repeats. Across sizes, tuning reduced mean model totals 4.3–8.6x
+for Chebyshev and 2.7–3.7x for GRF relative to newly measured, matched original
+settings. The frozen leaders are Cheb degree 6 / 32 probes / 16 Lanczos, and GRF
+J3 / halt .5 / 1024 walks / 16 probes / 16 Lanczos. Their primary outcomes are:
+
+| n | Independent datasets | Cheb total s | GRF total s | Cheb raw RMSE | GRF raw RMSE |
+| ---: | ---: | ---: | ---: | ---: | ---: |
+| 5000 | 3 | 7.292 | 13.169 | .59923250 | .60664069 |
+| 10000 | 3 | 19.860 | 25.617 | .60581520 | .61035491 |
+| 25000 | 2 | 86.546 | 71.943 | .60296754 | .60785513 |
+| 50000 | 1 | 103.164 | 110.051 | .60343136 | .60994083 |
+
+These are dataset means, not repeated-timing averages; full individual results,
+sample SD and paired differences are in [PR #8](https://github.com/josephor1271/graph-gp-research/pull/8). Cheb's RMSE changes by at most
+.00084% from its own original reference; GRF's rises .207–.387%. Cheb has lower
+RMSE on all nine paired datasets. The roughly 1% cross-method differences need
+paired evidence, not comparison with marginal dataset spread alone.
+
+There is **no stable measured crossover**: the primary 25K timing favored GRF,
+but a reversed-order repeat on identical inputs gave 45.63 s Cheb / 61.60 s GRF,
+versus 87.79 / 72.95 s originally. At 50K the repeat gave 95.59 / 115.56 s,
+versus 103.16 / 110.05 s originally. Model states, loss histories, RNG and RMSE
+are bit-identical in repeats. Keep both timings; their cause is not identified.
+Timing was not randomized on an isolated host, so precise crossover claims are
+unsupported. Primary four-size log-log exponents are 1.213/.950 for tuned
+Cheb/GRF and 1.090/.987 for originals; these are descriptive, not asymptotic laws.
+
+Higher-fidelity GRF J10 costs mean 286/719 s at 5K/10K without improving mean
+RMSE over Cheb; it does beat Cheb on one 10K seed. In the dev n=1000/walk-101
+kernel audit at beta=1.9, J10/1024 walks has .361 relative covariance error;
+J3/4096 has .846. Representation error
+is distinct from CG/SLQ error. The separate 200-step development check improves
+GRF RMSE .611468 to .609229 and Cheb .597185 to .597132; 100 steps are a finite
+optimization budget, not a convergence certificate.
+
 `experiment_speed_accuracy.py` follows the November 6 optimization work order,
 using new development and fresh final graph/data/split seeds. Historical results
 above remain historical. The generator accepts optional seeds/output directories;
@@ -712,3 +748,19 @@ includes off-timer dense audits. Operator counters are non-equivalent work units
 Raw settings, checkpoints, warnings, seed fingerprints, four reproducible figures
 and tables stay under ignored `results/speed_accuracy/`; full numerical tables
 and the frozen manifest belong to the PR.
+
+Validation: eight tests pass in both environments, including the unchanged
+strict-CG test warnings; five guarded sparse paths pass. All 109 case attempts
+completed without NumericalWarnings or resource-cap hits. Largest final true
+residual is 3.94e-5; largest final UTC/elapsed clock gap .028 s. Checkpoint update
+counts, float64 parameters, nine distinct final data fingerprints and frozen
+settings pass. Only plot presentation changed after the frozen experiment;
+all other experiment code is AST-identical to commit `3caa670`. Timing repeats
+use the same frozen leaders/seeds and fresh setup; exact replay commands and
+their declaration are in the PR and local `timing_command.txt`.
+
+Manifest: added one experiment script; changed the seed/output helper and this
+README; deleted nothing. Core kernels/model, dependencies, upstream, original
+evidence and old toolbox kept. No pending runs or further experiments; leave the
+PR unmerged. Limits include the small seed count, timing sensitivity, finite
+optimization, restricted inference grid, beta<=2 and unavailable variance/NLPD.

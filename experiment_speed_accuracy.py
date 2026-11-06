@@ -582,6 +582,10 @@ def figures():
             exponent = np.polyfit(np.log(sizes), np.log([np.mean([r["total_s"] for r in group if r["n"] == n]) for n in sizes]), 1)[0]
             append("finite_range_exponents.csv", dict(configuration=label(c), sizes=json.dumps(sizes), exponent=float(exponent)))
     axes[0].set_yscale("log")
+    for axis in axes:
+        axis.set_xlim(4000, 60000)
+        axis.set_xticks([5000, 10000, 25000, 50000])
+        axis.set_xticklabels(["5K", "10K", "25K", "50K"])
     axes[0].legend(fontsize=6)
     fig.suptitle("Frozen fresh seeds: mean ± sample SD; 3/3/2/1 datasets at 5K/10K/25K/50K")
     fig.tight_layout()
