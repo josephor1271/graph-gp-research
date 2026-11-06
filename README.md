@@ -600,47 +600,57 @@ historical experiments, requirements, upstream sources and old toolbox unchanged
 No pending runs. Limitations: two joint seeds, MC-sensitive gates, unverified paper
 figure, no peak-memory measurement. Leave the PR open and stop this experiment.
 
-## Held-out Mondays: frozen GRF C/H versus Chebyshev
+## Large synthetic graphs: actual sparse iterative GRF versus Chebyshev
 
-Three new Mondays; split default_rng(20261104), feature seeds 101/202, CPU float64/four
-threads, independent 1000-step AdamW .05 fits. C=(J3,p=.5,W4096), H=(J10,p=.1,W4096),
-both bounded beta; Cheb is degree 20 with observed Cholesky. C improves both oracle
-scores in all six cases (6/6 qualify), at 0.49–0.55× Cheb standalone cost. H qualifies
-6/6 at 1.99–2.53× cost with mixed NLPD. Three correlated dates/two draws are not six
-independent datasets; no calibration, cross-graph, large-m or universal claim follows.
+All 24 matched 100-update runs completed through n=50,000 (12,500 train/test each).
+GRF C is 1.29–2.09× faster in measured model totals; its noisy-test RMSE is
+0.47–0.96% higher. No timing crossover, failed/incomplete run or resource limit hit.
+At 50,000: Cheb 780.65 s / RMSE .604190; GRF C 373.37 s / RMSE .609002.
+Means below use three timing repeats through 5,000 nodes, one thereafter; graph,
+data, walks and probes are fixed across repeats, with bit-identical fitted scores.
 
-| Date (17:30) | Model | Feature seed | Oracle RMSE mph | Obs NLPD norm | Beta | Sigma_f | Noise var | NLL / obs | Train s | Standalone s |
-| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| 2017-01-09 | Cheb | — | 15.7385 | 1.421688 | 1.99556 | 1.45698 | 0.237140 | 1.356774 | 31.41 | 31.71 |
-| 2017-01-09 | C | 101 | 15.7014 | 1.359017 | 1.33733 | 1.36069 | 0.009830 | 1.372251 | 15.15 | 17.46 |
-| 2017-01-09 | C | 202 | 15.5145 | 1.341682 | 1.35218 | 1.36230 | 0.008494 | 1.371790 | 13.95 | 16.06 |
-| 2017-01-09 | H | 101 | 15.6534 | 1.428471 | 1.99612 | 1.46090 | 0.231788 | 1.352475 | 62.32 | 74.11 |
-| 2017-01-09 | H | 202 | 15.6048 | 1.408076 | 1.99316 | 1.44978 | 0.231457 | 1.360716 | 67.91 | 80.13 |
-| 2017-02-06 | Cheb | — | 16.0656 | 1.377650 | 1.99596 | 1.43668 | 0.246440 | 1.352924 | 39.86 | 39.95 |
-| 2017-02-06 | C | 101 | 15.8986 | 1.317218 | 1.40512 | 1.35316 | 0.009038 | 1.368829 | 17.61 | 19.90 |
-| 2017-02-06 | C | 202 | 15.7879 | 1.309319 | 1.43941 | 1.34715 | 0.007214 | 1.364173 | 17.47 | 19.59 |
-| 2017-02-06 | H | 101 | 16.0394 | 1.384520 | 1.99646 | 1.44034 | 0.241092 | 1.348565 | 69.98 | 81.74 |
-| 2017-02-06 | H | 202 | 15.9325 | 1.362398 | 1.99414 | 1.41645 | 0.252119 | 1.357625 | 67.16 | 79.33 |
-| 2017-03-06 | Cheb | — | 16.0346 | 1.476915 | 1.99544 | 1.40085 | 0.287205 | 1.361634 | 36.73 | 36.81 |
-| 2017-03-06 | C | 101 | 15.5541 | 1.397026 | 1.41993 | 1.35337 | 0.008939 | 1.369795 | 17.29 | 19.59 |
-| 2017-03-06 | C | 202 | 15.5036 | 1.384569 | 1.38177 | 1.36030 | 0.008704 | 1.371446 | 17.36 | 19.48 |
-| 2017-03-06 | H | 101 | 15.9855 | 1.480420 | 1.99589 | 1.39855 | 0.290974 | 1.360459 | 67.66 | 79.35 |
-| 2017-03-06 | H | 202 | 15.9862 | 1.472184 | 1.99438 | 1.39278 | 0.274930 | 1.360647 | 67.91 | 80.02 |
+| n | Train/test each | Method | Timing reps | Setup s | Train s | Mean prediction s | Model total s | Noisy-test RMSE |
+| ---: | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| 1000 | 250 | Cheb | 3 | 0.355 | 12.301 | 0.0109 | 12.667 | 0.589892 |
+| 1000 | 250 | GRF_C | 3 | 2.364 | 5.060 | 0.0099 | 7.435 | 0.595208 |
+| 2500 | 625 | Cheb | 3 | 0.350 | 20.847 | 0.0263 | 21.223 | 0.603283 |
+| 2500 | 625 | GRF_C | 3 | 5.651 | 10.823 | 0.0196 | 16.493 | 0.606118 |
+| 5000 | 1250 | Cheb | 3 | 0.354 | 56.816 | 0.0590 | 57.229 | 0.577812 |
+| 5000 | 1250 | GRF_C | 3 | 12.043 | 23.807 | 0.0407 | 35.891 | 0.582342 |
+| 10000 | 2500 | Cheb | 1 | 0.355 | 136.970 | 0.1099 | 137.435 | 0.594429 |
+| 10000 | 2500 | GRF_C | 1 | 28.512 | 55.459 | 0.0717 | 84.043 | 0.598794 |
+| 25000 | 6250 | Cheb | 1 | 0.494 | 394.773 | 0.2730 | 395.540 | 0.595196 |
+| 25000 | 6250 | GRF_C | 1 | 74.427 | 138.426 | 0.1968 | 213.050 | 0.600931 |
+| 50000 | 12500 | Cheb | 1 | 0.479 | 779.663 | 0.5058 | 780.648 | 0.604190 |
+| 50000 | 12500 | GRF_C | 1 | 128.179 | 244.901 | 0.2911 | 373.371 | 0.609002 |
 
-Own-kernel Cholesky scores use marginal observation variance, adding noise once.
-Standalone totals charge walks/setup/train/deployed prediction: GRF 512 pathwise
-draws, Cheb cold observed Cholesky; preparation/audits/I/O excluded. Mean standalone
-→amortized cost is C 18.68→17.31 s, H 79.11→71.75 s, Cheb 36.16 s, sharing walks
-across exactly three dates. One local `results/traffic/heldout/heldout.png` plots both
-oracle differences from Cheb; the PR gives all paired margins/timings/MC diagnostics.
-All 15 fits completed; eight tests pass in both environments, resume preserves fits,
-and data alignment/hashes pass. An optional lazy-GRF audit hit a CSR-stride error;
-independent dense checks pass (RMSE error <=3.56e-15). Logs/data/manifest stay ignored.
-From the existing PR #4–5 setup (full test/figure/logging commands are in the PR):
+Weighted jittered local grids use L=I-D^-1/2 W D^-1/2, bounded degree <=6.
+Independent SciPy expm_multiply generates beta_true=1.5 heat draws plus noise
+variance .1; 25% train/25% test, train-only normalization. Both learn bounded beta,
+signal std and noise, AdamW .05/100 steps, CPU float64/four threads, CG=1e-4,
+64 probes/24 Lanczos/no preconditioner/no Cholesky. GRF C is J3/.5/4096 walks,
+four sampler workers; source pins/adapters unchanged. Common prediction is mean
+only via ordinary ExactGP CG; NLPD/variance unavailable. Totals exclude graph/data,
+audit and I/O costs, but include GRF sampling/lazy feature work where it occurs.
+Training dominates. Empirical total exponents are 1.11/1.03 over these six sizes;
+these are finite-range fits, not O(n) training proofs. Heat is correctly specified
+by this generator; no universal real-data accuracy or large-graph variance claim.
+Parent high-water RSS at metric completion is 1249.8/1068.8 MiB at n=50,000,
+including process/data overhead; worker-inclusive sampled sums are separate.
+Small dense references, guarded sparse paths and data/split checks pass; largest
+Cheb mean residual 4.47e-6. Eight tests pass in both environments. Raw warnings,
+24 rows, status/manifest, graphs/targets/checkpoints and two inspected figures
+(runtime.png, rmse.png) stay in ignored results/large_synthetic; full tables in PR.
 
 ```sh
-results/traffic_env/bin/python experiment_grf_heldout.py --pilot
-results/traffic_env/bin/python experiment_grf_heldout.py
+mkdir -p results/large_synthetic
+caffeinate -i results/traffic_env/bin/python -u experiment_grf_large_synthetic.py --smoke > results/large_synthetic/smoke.log 2>&1
+caffeinate -i results/traffic_env/bin/python -u experiment_grf_large_synthetic.py > results/large_synthetic/sweep.log 2>&1
+results/traffic_env/bin/python -m unittest discover -s tests -v
+.venv/bin/python -m unittest discover -s tests -v
+results/traffic_env/bin/python experiment_grf_large_synthetic.py --figure-only
+git diff --check
 ```
-Manifest: one script plus README; no deletions, core/dependency/upstream/historical
-changes or pending fits. Stop here.
+Recorded attempts are skipped on resume; preserve original logs with a new filename.
+Manifest: one script plus this README; no deletions, core/dependency/upstream edits,
+PR merges or pending runs. Earlier experiments and old toolbox remain unchanged.
