@@ -47,10 +47,13 @@ def append_csv(name, row):
     path.with_suffix(".tmp").replace(path)
 
 
-def graph_data(n):
+def graph_data(n, seeds=None, output=None):
+    """Optional explicit seeds/output support independent replications; defaults are unchanged."""
+    directory = OUT if output is None else output
+    graph_seed, data_seed, split_seed = (31000+n, 41000+n, 51000+n) if seeds is None else seeds
     clock = perf_counter()
     height, width = SHAPES[n]
-    rng = np.random.default_rng(31000+n)
+    rng = np.random.default_rng(graph_seed)
     coordinates = np.indices((height, width)).reshape(2, -1).T + rng.uniform(-.15, .15, (n, 2))
     nodes = np.arange(n).reshape(height, width)
     first = np.concatenate([nodes[:, :-1].ravel(), nodes[:-1, :].ravel()])
@@ -68,11 +71,11 @@ def graph_data(n):
     metadata = dict(n=n, edges=len(first), mean_degree=float(degree.mean()), max_degree=int(degree.max()),
                     components=components, nnz_l=laplacian.nnz, graph_generation_s=perf_counter()-clock)
     clock = perf_counter()
-    rng = np.random.default_rng(41000+n)
+    rng = np.random.default_rng(data_seed)
     z = rng.standard_normal(n)
     truth = expm_multiply(-.75*laplacian, z)  # Independent SciPy heat half-kernel draw.
     observations = truth + np.sqrt(.1)*rng.standard_normal(n)
-    order = np.random.default_rng(51000+n).permutation(n)
+    order = np.random.default_rng(split_seed).permutation(n)
     train, test = order[:n//4], order[n//4:n//2]
     assert not np.intersect1d(train, test).size
     mean, scale = observations[train].mean(), observations[train].std()
@@ -81,12 +84,12 @@ def graph_data(n):
                     train_mean=float(mean), train_std=float(scale))
     fingerprint = hashlib.sha256(laplacian.data.tobytes()+laplacian.indices.tobytes()+
                                  normalized.tobytes()+order.tobytes()).hexdigest()
-    path = OUT / f"data_{n}.npz"
+    path = directory / f"data_{n}.npz"
     if path.exists():
         with np.load(path) as saved:
             assert str(saved["fingerprint"]) == fingerprint
     else:
-        sp.save_npz(OUT / f"laplacian_{n}.npz", laplacian)
+        sp.save_npz(directory / f"laplacian_{n}.npz", laplacian)
         np.savez(path, fingerprint=fingerprint, coordinates=coordinates, z=z, f=truth,
                  y=observations, normalized=normalized, train=train, test=test, mean=mean, scale=scale)
     clock = perf_counter()
