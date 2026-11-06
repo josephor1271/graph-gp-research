@@ -599,3 +599,48 @@ Manifest: added one script and this README evidence; deleted nothing. Core GP,
 historical experiments, requirements, upstream sources and old toolbox unchanged.
 No pending runs. Limitations: two joint seeds, MC-sensitive gates, unverified paper
 figure, no peak-memory measurement. Leave the PR open and stop this experiment.
+
+## Held-out Mondays: frozen GRF C/H versus Chebyshev
+
+Three new Mondays; split default_rng(20261104), feature seeds 101/202, CPU float64/four
+threads, independent 1000-step AdamW .05 fits. C=(J3,p=.5,W4096), H=(J10,p=.1,W4096),
+both bounded beta; Cheb is degree 20 with observed Cholesky. C improves both oracle
+scores in all six cases (6/6 qualify), at 0.49–0.55× Cheb standalone cost. H qualifies
+6/6 at 1.99–2.53× cost with mixed NLPD. Three correlated dates/two draws are not six
+independent datasets; no calibration, cross-graph, large-m or universal claim follows.
+
+| Date (17:30) | Model | Feature seed | Oracle RMSE mph | Obs NLPD norm | Beta | Sigma_f | Noise var | NLL / obs | Train s | Standalone s |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 2017-01-09 | Cheb | — | 15.7385 | 1.421688 | 1.99556 | 1.45698 | 0.237140 | 1.356774 | 31.41 | 31.71 |
+| 2017-01-09 | C | 101 | 15.7014 | 1.359017 | 1.33733 | 1.36069 | 0.009830 | 1.372251 | 15.15 | 17.46 |
+| 2017-01-09 | C | 202 | 15.5145 | 1.341682 | 1.35218 | 1.36230 | 0.008494 | 1.371790 | 13.95 | 16.06 |
+| 2017-01-09 | H | 101 | 15.6534 | 1.428471 | 1.99612 | 1.46090 | 0.231788 | 1.352475 | 62.32 | 74.11 |
+| 2017-01-09 | H | 202 | 15.6048 | 1.408076 | 1.99316 | 1.44978 | 0.231457 | 1.360716 | 67.91 | 80.13 |
+| 2017-02-06 | Cheb | — | 16.0656 | 1.377650 | 1.99596 | 1.43668 | 0.246440 | 1.352924 | 39.86 | 39.95 |
+| 2017-02-06 | C | 101 | 15.8986 | 1.317218 | 1.40512 | 1.35316 | 0.009038 | 1.368829 | 17.61 | 19.90 |
+| 2017-02-06 | C | 202 | 15.7879 | 1.309319 | 1.43941 | 1.34715 | 0.007214 | 1.364173 | 17.47 | 19.59 |
+| 2017-02-06 | H | 101 | 16.0394 | 1.384520 | 1.99646 | 1.44034 | 0.241092 | 1.348565 | 69.98 | 81.74 |
+| 2017-02-06 | H | 202 | 15.9325 | 1.362398 | 1.99414 | 1.41645 | 0.252119 | 1.357625 | 67.16 | 79.33 |
+| 2017-03-06 | Cheb | — | 16.0346 | 1.476915 | 1.99544 | 1.40085 | 0.287205 | 1.361634 | 36.73 | 36.81 |
+| 2017-03-06 | C | 101 | 15.5541 | 1.397026 | 1.41993 | 1.35337 | 0.008939 | 1.369795 | 17.29 | 19.59 |
+| 2017-03-06 | C | 202 | 15.5036 | 1.384569 | 1.38177 | 1.36030 | 0.008704 | 1.371446 | 17.36 | 19.48 |
+| 2017-03-06 | H | 101 | 15.9855 | 1.480420 | 1.99589 | 1.39855 | 0.290974 | 1.360459 | 67.66 | 79.35 |
+| 2017-03-06 | H | 202 | 15.9862 | 1.472184 | 1.99438 | 1.39278 | 0.274930 | 1.360647 | 67.91 | 80.02 |
+
+Own-kernel Cholesky scores use marginal observation variance, adding noise once.
+Standalone totals charge walks/setup/train/deployed prediction: GRF 512 pathwise
+draws, Cheb cold observed Cholesky; preparation/audits/I/O excluded. Mean standalone
+→amortized cost is C 18.68→17.31 s, H 79.11→71.75 s, Cheb 36.16 s, sharing walks
+across exactly three dates. One local `results/traffic/heldout/heldout.png` plots both
+oracle differences from Cheb; the PR gives all paired margins/timings/MC diagnostics.
+All 15 fits completed; eight tests pass in both environments, resume preserves fits,
+and data alignment/hashes pass. An optional lazy-GRF audit hit a CSR-stride error;
+independent dense checks pass (RMSE error <=3.56e-15). Logs/data/manifest stay ignored.
+From the existing PR #4–5 setup (full test/figure/logging commands are in the PR):
+
+```sh
+results/traffic_env/bin/python experiment_grf_heldout.py --pilot
+results/traffic_env/bin/python experiment_grf_heldout.py
+```
+Manifest: one script plus README; no deletions, core/dependency/upstream/historical
+changes or pending fits. Stop here.
