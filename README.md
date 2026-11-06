@@ -599,3 +599,58 @@ Manifest: added one script and this README evidence; deleted nothing. Core GP,
 historical experiments, requirements, upstream sources and old toolbox unchanged.
 No pending runs. Limitations: two joint seeds, MC-sensitive gates, unverified paper
 figure, no peak-memory measurement. Leave the PR open and stop this experiment.
+
+## Large synthetic graphs: actual sparse iterative GRF versus Chebyshev
+
+All 24 matched 100-update runs completed through n=50,000 (12,500 train/test each).
+GRF C is 1.29–2.09× faster in measured model totals; its noisy-test RMSE is
+0.47–0.96% higher. No timing crossover, failed/incomplete run or resource limit hit.
+At 50,000: Cheb 780.65 s / RMSE .604190; GRF C 373.37 s / RMSE .609002.
+Means below use three timing repeats through 5,000 nodes, one thereafter; graph,
+data, walks and probes are fixed across repeats, with bit-identical fitted scores.
+
+| n | Train/test each | Method | Timing reps | Setup s | Train s | Mean prediction s | Model total s | Noisy-test RMSE |
+| ---: | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| 1000 | 250 | Cheb | 3 | 0.355 | 12.301 | 0.0109 | 12.667 | 0.589892 |
+| 1000 | 250 | GRF_C | 3 | 2.364 | 5.060 | 0.0099 | 7.435 | 0.595208 |
+| 2500 | 625 | Cheb | 3 | 0.350 | 20.847 | 0.0263 | 21.223 | 0.603283 |
+| 2500 | 625 | GRF_C | 3 | 5.651 | 10.823 | 0.0196 | 16.493 | 0.606118 |
+| 5000 | 1250 | Cheb | 3 | 0.354 | 56.816 | 0.0590 | 57.229 | 0.577812 |
+| 5000 | 1250 | GRF_C | 3 | 12.043 | 23.807 | 0.0407 | 35.891 | 0.582342 |
+| 10000 | 2500 | Cheb | 1 | 0.355 | 136.970 | 0.1099 | 137.435 | 0.594429 |
+| 10000 | 2500 | GRF_C | 1 | 28.512 | 55.459 | 0.0717 | 84.043 | 0.598794 |
+| 25000 | 6250 | Cheb | 1 | 0.494 | 394.773 | 0.2730 | 395.540 | 0.595196 |
+| 25000 | 6250 | GRF_C | 1 | 74.427 | 138.426 | 0.1968 | 213.050 | 0.600931 |
+| 50000 | 12500 | Cheb | 1 | 0.479 | 779.663 | 0.5058 | 780.648 | 0.604190 |
+| 50000 | 12500 | GRF_C | 1 | 128.179 | 244.901 | 0.2911 | 373.371 | 0.609002 |
+
+Weighted jittered local grids use L=I-D^-1/2 W D^-1/2, bounded degree <=6.
+Independent SciPy expm_multiply generates beta_true=1.5 heat draws plus noise
+variance .1; 25% train/25% test, train-only normalization. Both learn bounded beta,
+signal std and noise, AdamW .05/100 steps, CPU float64/four threads, CG=1e-4,
+64 probes/24 Lanczos/no preconditioner/no Cholesky. GRF C is J3/.5/4096 walks,
+four sampler workers; source pins/adapters unchanged. Common prediction is mean
+only via ordinary ExactGP CG; NLPD/variance unavailable. Totals exclude graph/data,
+audit and I/O costs, but include GRF sampling/lazy feature work where it occurs.
+Training dominates. Empirical total exponents are 1.11/1.03 over these six sizes;
+these are finite-range fits, not O(n) training proofs. Heat is correctly specified
+by this generator; no universal real-data accuracy or large-graph variance claim.
+Parent high-water RSS at metric completion is 1249.8/1068.8 MiB at n=50,000,
+including process/data overhead; worker-inclusive sampled sums are separate.
+Small dense references, guarded sparse paths and data/split checks pass; largest
+Cheb mean residual 4.47e-6. Eight tests pass in both environments. Raw warnings,
+24 rows, status/manifest, graphs/targets/checkpoints and two inspected figures
+(runtime.png, rmse.png) stay in ignored results/large_synthetic; full tables in PR.
+
+```sh
+mkdir -p results/large_synthetic
+caffeinate -i results/traffic_env/bin/python -u experiment_grf_large_synthetic.py --smoke > results/large_synthetic/smoke.log 2>&1
+caffeinate -i results/traffic_env/bin/python -u experiment_grf_large_synthetic.py > results/large_synthetic/sweep.log 2>&1
+results/traffic_env/bin/python -m unittest discover -s tests -v
+.venv/bin/python -m unittest discover -s tests -v
+results/traffic_env/bin/python experiment_grf_large_synthetic.py --figure-only
+git diff --check
+```
+Recorded attempts are skipped on resume; preserve original logs with a new filename.
+Manifest: one script plus this README; no deletions, core/dependency/upstream edits,
+PR merges or pending runs. Earlier experiments and old toolbox remain unchanged.
