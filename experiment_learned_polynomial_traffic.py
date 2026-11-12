@@ -99,13 +99,7 @@ def run(data, date, arm, seed, steps, old_rows, data_sha):
             checkpoint = HELD/f"fit_{index}_{arm}_{seed}.pt"
             assert prior["status"] == "complete"
             if not checkpoint.exists():
-                label = "Heat" if arm == "Cheb" else f"C/{seed}"
-                values = [float(prior[k]) for k in ("oracle_rmse","oracle_nlpd","kernel_nll")]
-                reference = f"|{row['timestamp'][:10]}|{label}|" + "|".join(f"{v:.6f}" for v in values) + "|"
-                assert reference in Path(__file__).with_name("LEARNED_POLYNOMIAL_TRAFFIC.md").read_text()
-                row.update(status="historical_only",rmse=values[0],nlpd=values[1],nll=values[2],
-                    setup_s=float(prior["setup_s"]),train_s=float(prior["train_s"]),pred_s=float(prior["pred_s"]),checkpoint="unavailable")
-                return
+                raise FileNotFoundError(f"Missing historical PR6 checkpoint: {checkpoint}; baseline not refitted")
         if checkpoint.exists():
             saved = torch.load(checkpoint,weights_only=True)
             assert len(saved["losses"]) == steps and np.isfinite(saved["losses"]).all()
