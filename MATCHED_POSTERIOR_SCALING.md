@@ -1,158 +1,157 @@
-# Matched posterior uncertainty: native noise precision mismatch
+# Matched posterior uncertainty: no common MC budget qualifies
 
-**Stopped again before qualification/scaling.** The authorized diagnostic explains
-PR19's original native-versus-adapter path discrepancy: upstream's implicit
-float32 identity rounds the conditioning noise. Both implementations meet the
-residual and same-draw variance gates, but **strict operator equivalence fails**.
-No P* was selected; no 5K–50K predictions or designated large guarded audits ran.
-This leaves the scaling question unanswered and establishes no speed advantage.
+**The amended numerical qualification passes; the frozen Monte Carlo qualification
+does not.** General passes18/24 combinations at512 paths and23/24 at1024.
+No common P* was selected. Per the original stopping rule, all144 planned
+5K–50K predictions and their designated large guarded audits remain unattempted.
+No scaling, speed, reconstructed-total or memory advantage is claimed.
 
-## Original failure and authorized amendment
+## Protocol and preserved evidence
 
-Base main `31fd991282f8f026931edb71da7a3bbc8d1e985e` contains merged PR18.
-The original PR19 commit `fd6febe3211ac3cc4c45729937ce0b4a4ebe34b8` remains in
-history. Its complete failed attempt, manifest, source, thresholds, logs,
-reference/bracket arrays and results are preserved: all **41 original study files**
-are byte-identical. All **3,570 earlier artifacts** and their filename set also
-remain unchanged. New evidence is isolated under the ignored
-`results/matched_posterior_scaling/continuation/` directory.
+The benchmark method is **official GeneralGRF features with a batched float64
+posterior inference adapter**, compared with our existing Poly root. It is not
+unmodified native prediction. Both use their own fitted covariance K=BB^T,
+analytic-form iterative mean and centered paths with conditioning noise once;
+unbiased streaming variance adds observation noise once for scoring.
+CPU float64/four threads, width32, CG1e-4/max1000/no preconditioner/n_tridiag0;
+no training, kernel, solver, seed or dependency changes. No SLQ for prediction.
+PR16 n1000/r10,11 weighted normalized graphs use train/test250 each and training-only
+normalization: H covariance exp(−1.5L), M .5exp(−1.5L)+.5(L/2)², raw noise variance.1.
 
-Original n36/r9/H/initial General, seed521/32 paths: native path parity failed
-at atol1e-10/rtol1e-9, with max absolute **7.154941639e-9**, max relative
-**7.538366823e-7**, 158/288 mismatched elements. Original mean max error1.881e-6,
-mean true residual5.488e-6; exact covariance/map discrepancies0/2.776e-16.
-The three selected variance brackets contained dense references, max relative
-width8.221e-13, max true reference residual8.038e-6. Original attempt2.490s,
-sampled inclusive peak426.75MiB. Nothing in that record was relabeled successful.
+Main base31fd991 contains merged PR18; this continues PR19 from8a08096.
+After reviewing the two preserved failures, the planner authorized strict
+comparisons against float64 algebra for the adapter and independently verified
+float32 noise-diagonal conversion for native General. Both retain original
+atol1e-10/rtol1e-9. The adapter noise is unchanged. The residual-aware path bound
+includes measured operator/RHS differences, known noise perturbation and float64
+roundoff; residual<=2e-4 and same-draw variance L2<=.002 gates are unchanged.
+This is an explicit post-observation protocol amendment, not a relabeled pass.
 
-After reviewing that failure, the planner authorized one focused diagnostic and
-conditional continuation, replacing near-machine-precision approximate-path
-parity with a residual-aware check **only if deterministic equivalence passes**.
-Strict algebra atol1e-10/rtol1e-9, true residual<=2e-4, same-draw Cholesky
-variance relative L2<=.002 and all MC gates remain unchanged. The planner explicitly
-approved up to450 Python lines; the existing driver is now432 lines. No new
-tracked files, dependencies, classes, solver settings or upstream edits.
+The original7.15494e-9 path mismatch and1.84986e-8 native noise-diagonal shift,
+all old thresholds, manifests, logs, diagnostics and source snapshots remain.
+Git commits fd6febe/8a08096 retain their complete reports and one-time diagnostic
+code. All **3,653 earlier result files and the inventoried filename set** are
+unchanged. New evidence is isolated in ignored
+`results/matched_posterior_scaling/matched/`. The active driver shrank432→358
+lines by removing the one-time trace investigation and saved-array explanation.
 
-## Focused diagnostic: actual native CG captured
+## Numerical qualification
 
-Used the original graph, walks, state, seed521 and identical z/e perturbations.
-Scoped instrumentation captures the actual pinned `pathwise_conditioning` CG
-operator, signed RHS, solution and product trace without editing upstream.
-Native batch-major draws/signs were reconciled with the adapter's centered paths.
-Independent reference uses a dense weighted sum of the actual saved walk matrices,
-K=BB^T, dense Cholesky and the full posterior sampling-map covariance.
+Completed the minimal original n36/r9/H/initial General seed521 regression, then
+all11 remaining original invocations: tiny stress General, tiny Poly, one fitted
+n1000 Poly regression and eight prescribed General states on r10/11. General uses
+seeds521/522/523 and nested512/1024 prefixes; prior Poly421/422/423 support was
+verified without rerunning PR18. All **53 state/stream/prefix numerical checks**
+pass; no NumericalWarning, invalid variance, jitter/clipping or zero sampling RHS.
 
-| Diagnostic against independent dense reference | Adapter | Native |
+The amended tiny initial strict algebra discrepancy is<=1.111e-15. Actual native
+CG residual7.624e-6 and identical-draw variance error1.510e-7 pass. Native noise
+.6932471990585327 matches the explicitly checked float32 conversion of adapter
+noise.6932471805599453; the entire conditioning-matrix difference is that scalar
+shift times identity. The tiny stress regression also passes; no unexpected
+operator difference was accepted. Independent actual-walk covariance/full-map
+checks and streaming-vs-torch.var checks retain strict tolerances.
+
+| Maximum across completed checks | Measured | Gate |
 |---|---:|---:|
-| Conditioning A, max abs discrepancy | 2.220e-16 | **1.850e-8 (FAIL)** |
-| Cross-covariance C, max abs discrepancy | 2.776e-17 | 2.776e-17 |
-| Positive conditioning RHS, max abs discrepancy | 8.882e-16 | 8.882e-16 |
-| Actual true per-RHS residual, maximum | 7.624118e-6 | 7.624118e-6 |
-| Same-draw latent variance relative L2 | 1.509226e-7 | 1.510366e-7 |
-| Same-draw empirical full covariance relative error | 5.585905e-7 | 5.589514e-7 |
-| Posterior path vs common Cholesky, max abs | 2.516335e-6 | 2.517655e-6 |
-| CG iterations | 11 | 11 |
+| Sampling true per-RHS relative residual | 1.41524e-4 | 2e-4 |
+| Mean true residual | 8.98123e-5 | 2e-4 |
+| Mean max abs / relative L2 discrepancy | 1.81653e-4 / 8.06705e-5 | max abs .002 |
+| Variance L2 vs identical-draw Cholesky | 6.12939e-6 | .002 |
+| Selected-column relative bracket width | 8.00406e-6 | .002 |
 
-Full/selected prior products agree with dense algebra within1.111e-15;
-A.matmul versus A._matmul agrees exactly for both operators. Both RHS strides are
-[32,1]. A focused replay with contiguous batch-major draws produces exactly the
-same native paths. sqrt(nu)^2-nu is zero here. No sign, transpose, layout or feature
-orientation error was found. Both use actual B=Phi with BB^T, never B².
-Exact conditioning-map covariances agree with the independent Schur complement
-within3.331e-16. Empirical covariance/variance comparisons use identical32 draws;
-they do not establish MC accuracy against analytic variance at P32.
+All12 selected-column audits executed under guards, with positive lower bounds
+and independent dense containment to the original roundoff tolerance. Their
+maximum true reference residual was8.63342e-4: the oracle's prescribed acceptance
+uses finite residuals and verified bracket width, rather than assuming requested
+CG tolerance is a per-column guarantee. This does not relax the mean/path gates.
+These are tiny/n1000 audits, not evidence that large guarded audits executed.
 
-**Identified cause:** installed `IdentityLinearOperator.__init__` defaults to
-literal `dtype=torch.float` despite a float64 Torch default. Upstream constructs
-`noise_std.pow(2) * IdentityLinearOperator(m, device=device)` without dtype;
-its constant diagonal is float32. The adapter's explicit noise diagonal is float64.
-The fitted noise is .6932471805599453; its float32 value is .6932471990585327,
-a shift **delta=1.84985874396304e-8**. Captured native A minus adapter A equals
-delta I to1.111e-16. This fails the original strict algebra tolerance; it is a
-real finite-precision operator difference, not merely different CG stopping.
+## Frozen MC decision
 
-Analysis of saved arrays, without rerunning sampling or CG, separates the effects:
-exact solves of the two captured systems differ in paths by7.154866366e-9;
-the differential iterative-error contribution is at most2.114e-13. Perturbing
-only the independent dense noise diagonal by delta predicts the observed native
-path difference to **2.115e-13**. Thus noise casting explains essentially all of
-the original discrepancy. Each solve's own absolute path error is about2.516e-6;
-those similar errors largely cancel in the native-versus-adapter comparison.
+Each row below covers two development graphs × three streams, with their own
+analytic finite-kernel posterior as reference. H/M share data; streams/prefixes
+are not independent datasets. Targets: latent L2<=10%, observation L2<=5%.
+Times are measured preparation+mean+paths+streaming moments; no projections.
 
-Effective CG settings are unchanged: tolerance1e-4/max1000/no preconditioner,
-n_tridiag0, eps1e-10, per-column stop_updating_after1e-10, terminate-by-size off.
-The library checks the **mean** normalized residual after at least11 iterations
-and has small-denominator safeguards; actual maximum residuals are audited
-separately. No solver sweep or safeguard change was performed.
+| General state | P | Latent error % range | Observation error % range | Joint passes | Prediction ms range |
+|---|---:|---:|---:|---:|---:|
+|initial H|512|5.93–6.81|3.00–3.36|6/6|508.7–622.2|
+|initial H|1024|3.98–4.59|2.01–2.30|6/6|987.2–1115.8|
+|stress H|512|5.71–7.09|5.24–6.48|0/6|843.1–1006.6|
+|stress H|1024|4.07–5.59|3.73–5.11|5/6|1694.7–1895.7|
+|fitted H|512|6.00–6.91|2.73–4.17|6/6|494.9–648.6|
+|fitted H|1024|4.06–4.73|1.88–3.07|6/6|1000.7–1198.7|
+|fitted M|512|5.55–6.88|0.67–1.43|6/6|503.4–628.7|
+|fitted M|1024|3.93–4.78|0.47–0.99|6/6|1009.2–1145.6|
 
-## Residual-aware equivalence and stopping decision
+Latent gates pass24/24 at both budgets; observation/joint counts are18/24 and
+23/24. Prior Poly supports24/24 at each budget and its new regression passes,
+but the common rule requires **all24 General combinations**, including stress.
+We did not discard the stress control because fitted states passed.
 
-For common independent A0,b0 and each implementation i, the captured true residual
-ri=bi-Ai(xi) gives
+The sole1024 miss is **r10/H/stress/seed522**: latent5.594369%, observation
+**5.111535%**. Its true sampling residual1.33018e-4 and same-draw variance
+error2.75251e-6 pass. Exact Cholesky conditioning of those identical perturbations
+still gives observation error **5.111562%**. This is finite-sample MC error,
+not an inference defect cured by tighter CG. Stress uses prescribed modulation
+[1.5,−3.225,1.35], noise variance.05; no state or seed was retuned.
+Aggregate error is not pointwise: worst1024 latent/observation node errors are
+18.42%/15.09%, and worst per-state p95 errors9.82%/8.12%.
 
-```
-||xi-x*|| <= (||ri|| + ||bi-b0|| + ||Ai(xi)-A0 xi|| + roundoff)/lambda_lower
-```
+## Predictive scores, costs and limitations
 
-Propagate through ||C0||_F, adding measured prior-product and Ci(xi)-C0 xi
-differences. Comparing with computed Cholesky paths also includes its true
-residual. Sum individual bounds for native-versus-adapter paths. The code uses
-IEEE float64 gamma terms for Gram assembly and norm/product/subtraction rounding;
-lambda_lower subtracts the Gram/noise assembly error bound from nu. Every path
-satisfies its propagated bound, and both unchanged residual/variance gates pass.
-Per-column path bounds span2.016e-6–2.780e-5; observed norm errors are<=4.150e-6.
-This is a floating-point diagnostic, not a formal certified enclosure.
+General1024 sampled scores below range over the same six combinations per state.
+RMSE uses the analytic-form iterative mean, not sample mean; NLPD is marginal
+**observation** NLPD. Exact stress coverage is only72.4–73.2% at nominal95%, so
+numerical fidelity does not establish calibration of this deliberately fixed state.
 
-However, deterministic operator equivalence fails **before** those approximate
-path checks can authorize continuation. Per planner step6, stop for review.
-One diagnostic attempt failed; the remaining11 qualification invocations and
-all144 final predictions are explicitly unattempted. General's24 combinations
-at each of P512/P1024 were not evaluated. Prior Poly24/24 support at both budgets
-cannot replace General qualification. No final schedule was activated, no model
-was retrained, no failed diagnostic was rerun, and no large cache was generated.
+| State | Raw RMSE | Raw NLPD | 95% observation coverage |
+|---|---:|---:|---:|
+|initial H|.561338–.598339|.868882–.948074|.980–.984|
+|stress H|.626936–.681073|1.537898–1.625768|.716–.736|
+|fitted H|.554718–.585408|.829337–.895974|.944–.964|
+|fitted M|.575216–.599359|.869220–.908872|.972–.976|
 
-## Costs, provenance and reproduction
+All normalized/raw scores, observation SDs/interval widths, exact references,
+per-node variances and residuals remain in CSV/JSON/NPZ. Raw variance multiplies
+by scale²; raw NLPD adds log(scale), with training-only normalization.
+Qualification attempt wall totals71.454s, max9.112s; sampled process-group peak
+515.70MiB includes imports, dense references and guards. Candidate phase timers
+exclude references/residual audits/scoring/I/O, but include guard overhead and
+library warmup. These development timings/RSS do not support a fair large-scale
+speed or memory claim. No1800s/case,4h total or12GiB cap was hit.
+Only two previously seen development datasets and fixed states were checked;
+no large uncertainty, statistical significance, population calibration or universal
+sample-budget guarantee follows. All144 final outcomes are explicitly unattempted
+(36 each at5K/10K/25K/50K); no final schedule was activated or budget increased.
 
-Authorized diagnostic:3.035s wall, sampled process-group peak359.56MiB, including
-imports, dense references, guards and instrumentation; not candidate-only memory.
-Its bracket audit41.254ms, preparation1.244ms, mean17.004ms are partial instrumented
-costs. No complete prediction timing, reconstructed/amortized total, paired ratio
-or scaling figure exists. No resource cap was reached (1800s/case,4h,12GiB).
-Four sparse/storage UserWarnings and no NumericalWarning were recorded in each
-attempt. A saved-array analysis helper initially hit variable shadowing; fixed
-and logged without rerunning sampling or CG. No jitter/clipping/variance repair.
+## Reproduction and verification
 
-CPU float64/four threads, Apple M4/16GiB, macOS26.6.2; Torch2.11.0,
-GPyTorch1.15.2, linear_operator0.6.1, NumPy1.26.4, SciPy1.17.1, unchanged.
-Clean pins: Fast-Graph-GP `268fff9a3724cdd480dce4b2946068d8211b4f30`;
-authors' experiments `274b7ee393ee516585552f053e9d4a9c6ad2222f`.
-The frozen48 PR17 endpoints, PR16 identities, input/checkpoint hashes and original
-walk metadata remain intact. The only new walks are the original permitted tiny
-cache:W1024/J3/halt.5/seed1671036/four workers; it was reused for this diagnostic.
-
-The continuation contains its pre-run amendment, manifest/source snapshot, native
-operator/RHS/solution/path/trace arrays, explanation JSON, CSV metrics, all
-unattempted statuses, warnings, resource logs, tests and preservation hashes.
-`native_audit` and `explain_native` keep numerical logic in the tracked driver;
-local launcher/table scripts only handle metadata, resources and presentation.
-Source snapshots distinguish the diagnostic execution from later saved-array
-analysis; the original manifest was never overwritten. With retained local data:
+Retained local evidence includes `amendment.md`, frozen `manifest.json`,
+`selection.json`, `rows.csv` (all53 checks), `summary.json`, per-case arrays/logs,
+resource records, `unattempted_final.csv` and preservation hashes. Metadata-only
+local launch/table scripts contain no additional inference or solver methods.
+Exact execution used the retained watchdog with phases `regression` then
+`qualification`; it checks failed JSON status, not only process exit code:
 
 ```sh
-cat results/matched_posterior_scaling/continuation/native_explanation.json
-cat results/matched_posterior_scaling/continuation/diagnostic_metrics.csv
-cat results/matched_posterior_scaling/continuation/summary.json
+caffeinate -i results/traffic_env/bin/python -u results/matched_posterior_scaling/matched/launch_local.py regression
+caffeinate -i results/traffic_env/bin/python -u results/matched_posterior_scaling/matched/launch_local.py qualification
+cat results/matched_posterior_scaling/matched/selection.json
 results/traffic_env/bin/python -m unittest discover -s tests -v
 .venv/bin/python -m unittest discover -s tests -v
 git diff --check
 ```
 
-Execution used `caffeinate -i results/traffic_env/bin/python -u results/matched_posterior_scaling/continuation/launch_local.py diagnostic`.
-Saved-array analysis used `study.explain_native()` under torch.no_grad(), float64,
-four threads. Both refuse to overwrite evidence; further execution requires
-planner review. A fresh clone lacks ignored checkpoints, walks and manifests.
-Baseline/final suites:9/9 in both environments, with the same three existing
-strict-CG NumericalWarnings per suite; py_compile and diff checks pass.
-Changed: existing experiment/report only; deleted:nothing; kept:all prior source,
-training, kernels and evidence. Open issue: planner decision on native identity
-noise precision is required before any qualification or scaling continuation.
+Commands refuse to overwrite attempts; replay requires an isolated copy with the
+frozen prerequisites and clean new output. A fresh clone lacks ignored inputs.
+Unchanged Apple M4/16GiB, CPU float64/four threads; Torch2.11.0, GPyTorch1.15.2,
+linear_operator0.6.1, NumPy1.26.4, SciPy1.17.1. Clean pinned upstream commits:
+Fast-Graph-GP268fff9a3724cdd480dce4b2946068d8211b4f30 and authors' experiments
+274b7ee393ee516585552f053e9d4a9c6ad2222f. All60 frozen identities/packages verify.
+Baseline/final tests:9/9 in both environments, with the same three existing
+strict-CG NumericalWarnings per suite; py_compile/diff checks pass.
+Changed: existing driver/report only; deleted: one-time diagnostic code;
+kept: kernels, training, dependencies and all earlier evidence. Open issue:
+no budget satisfies the frozen all-case rule; further research needs planner review.

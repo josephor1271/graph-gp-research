@@ -15,14 +15,13 @@ from torch.utils._python_dispatch import _disable_current_modes
 from linear_operator.operators import LinearOperator
 from linear_operator.utils.linear_cg import linear_cg
 from linear_operator.utils.warnings import NumericalWarning
-from linear_operator import settings
 import experiment_poly_posterior as poly
 import experiment_learned_kernel_scaling as prior
 import experiment_learned_kernel_scaling_final as fitted
 from grf_gp.inference import pathwise_conditioning
 
 OUT = Path(__file__).resolve().parent/"results/matched_posterior_scaling"
-RUN = OUT/"continuation"
+RUN = OUT/"matched"
 SEEDS = (521,522,523)
 
 
@@ -161,137 +160,60 @@ def tiny_checks(graph, train, test, model, arm, reference):
 
 
 def native_audit(B, A, C, nu, train, test, z, e, f0, rhs, x, u, reference, label):
-    """Tiny-only native capture; deterministic algebra stays strict, paths use residual bounds."""
-    captured = []
+    """Minimal amended parity regression; native noise casting is explicit, never copied into A."""
+    captured = {}
     def capture(matmul, b, **kwargs):
-        trace = []
-        def product(v):
-            result = matmul(v)
-            trace.append(dict(denominator=(v*result).sum(0).tolist(),input=v.tolist()))
-            return result
-        solution = linear_cg(product,b,**kwargs)
-        captured.append(dict(operator=matmul.__self__,rhs=b.clone(),x=solution,trace=trace))
+        solution = linear_cg(matmul,b,**kwargs)
+        captured.update(operator=matmul.__self__,rhs=-b,x=-solution)
         return solution
     with patch("grf_gp.inference.linear_cg",side_effect=capture), patch("torch.randn",side_effect=[z.T,e.T]):
         native = pathwise_conditioning(train,test,B,torch.zeros(len(train)),nu.sqrt(),z.shape[1],torch.device("cpu")).T
-    repeated = capture(A.matmul,rhs,n_tridiag=0,tolerance=1e-4,max_iter=1000,preconditioner=None)
-    original,adapted = captured
-    with patch("grf_gp.inference.linear_cg",side_effect=capture), patch("torch.randn",side_effect=[z.T.contiguous(),e.T.contiguous()]):
-        contiguous = pathwise_conditioning(train,test,B,torch.zeros(len(train)),nu.sqrt(),z.shape[1],torch.device("cpu")).T
-    traces = dict(native=original["trace"],adapter=adapted["trace"])
-    N,xn,bn = original["operator"],-original["x"],-original["rhs"]
-    CN = B[test]@B[train].T
+    N,xn,bn = captured["operator"],captured["x"],captured["rhs"]
     dense,factor,cross,_,_ = reference
-    m,n = len(train),len(dense)
-    eye = torch.eye(m)
+    eye = torch.eye(len(train))
     A0 = dense[train]@dense[train].T+nu*eye
-    b0 = (dense@z)[train]+nu.sqrt()*e
-    fp = (dense@z)[test]
+    native_noise = nu.sqrt().square().float().double()
+    aa,na = A@eye,N._matmul(eye)
+    f,b0 = dense@z,(dense@z)[train]+nu.sqrt()*e
     exact_x = torch.cholesky_solve(b0,factor)
-    exact = fp-cross@exact_x
+    exact = f[test]-cross@exact_x
     native_prior = (z.T@B[test].T).T
-    selected = (z.T@B[train].T).T
-    matrices = dict(adapter_A=A@eye,native_A=N._matmul(eye),adapter_C=C@eye,native_C=CN@eye)
-    deterministic = [(matrices["adapter_A"],A0),(matrices["native_A"],A0),
-        (matrices["adapter_C"],cross),(matrices["native_C"],cross),(rhs,b0),(bn,b0),
-        (f0,dense@z),(native_prior,fp),(selected,(dense@z)[train]),(B[train]@z,f0[train]),
-        (A.matmul(eye),A._matmul(eye)),(N.matmul(eye),N._matmul(eye)),
-        (repeated,x),(native,native_prior-CN@xn)]
-    # Gram assembly error bounds lambda_min(A0); gamma terms also cover norm/subtraction rounding.
-    eps = torch.finfo(torch.float64).eps/2
-    gram_gamma = n*eps/(1-n*eps)
-    gamma = (8*m+4)*eps/(1-(8*m+4)*eps)
+    path = RUN/f"native_{label}.npz"
+    assert not path.exists()
+    np.savez(path,z=z.numpy(),e=e.numpy(),adapter_A=aa.numpy(),native_A=na.numpy(),rhs=rhs.numpy(),native_rhs=bn.numpy(),adapter_x=x.numpy(),native_x=xn.numpy(),adapter_paths=u.numpy(),native_paths=native.numpy(),exact_paths=exact.numpy())
+    assert N._diag_tensor.dtype == torch.float32
+    deterministic = [(aa,A0),(na,A0+(native_noise-nu)*eye),
+        (na-aa,(native_noise-nu)*eye),(C@eye,cross),(rhs,b0),(bn,b0),
+        (f0,f),(native_prior,f[test]),(N._diag_tensor.diagonal().double(),native_noise.expand(len(train)))]
+    for actual,expected in deterministic:
+        torch.testing.assert_close(actual,expected,atol=1e-10,rtol=1e-9)
+    eps,m,n = torch.finfo(torch.float64).eps/2,len(train),len(dense)
+    gram_gamma,gamma = n*eps/(1-n*eps),(8*m+4)*eps/(1-(8*m+4)*eps)
     lower = nu-gram_gamma*(dense[train].abs()@dense[train].abs().T).norm()-eps*(A0.norm()+nu)
     assert lower > 0
-    chol_residual = (b0-A0@exact_x).norm(dim=0)+gamma*(b0.norm(dim=0)+(A0.abs()@exact_x.abs()).norm(dim=0))
-    metrics,arrays,bounds = {},dict(z=z,e=e,A0=A0,C0=cross,b0=b0,exact_x=exact_x,exact_paths=exact,
-        native_cg_rhs=original["rhs"],native_cg_solution=original["x"],contiguous_paths=contiguous),[]
-    for name,operator,correction,bi,xi,prior_i,paths_i in (
-            ("adapter",A,C,rhs,x,f0[test],u),("native",N,CN,bn,xn,native_prior,native)):
-        action = operator._matmul if name == "native" else operator.matmul
-        ax,ci = action(xi),correction@xi
-        ri,stats,values = residual(operator,xi,bi,action)
-        operator_difference = (ax-A0@xi).norm(dim=0)
-        rhs_difference = (bi-b0).norm(dim=0)
-        solution_budget = (ri.norm(dim=0)+operator_difference+rhs_difference+
-            gamma*(bi.norm(dim=0)+ax.norm(dim=0)+(A0.abs()@xi.abs()).norm(dim=0)))/lower
-        budget = (prior_i-fp).norm(dim=0)+cross.norm()*solution_budget+(ci-cross@xi).norm(dim=0)
-        budget += cross.norm()*chol_residual/lower+gamma*(prior_i.norm(dim=0)+fp.norm(dim=0)+ci.norm(dim=0)+(cross.abs()@xi.abs()).norm(dim=0))
-        centered,exact_centered = paths_i-paths_i.mean(1,keepdim=True),exact-exact.mean(1,keepdim=True)
-        covariance,exact_covariance = centered@centered.T/(z.shape[1]-1),exact_centered@exact_centered.T/(z.shape[1]-1)
-        same_draw = float((paths_i.var(1,unbiased=True)-exact.var(1,unbiased=True)).norm()/exact.var(1,unbiased=True).norm())
-        Ai,Ci = matrices[f"{name}_A"],matrices[f"{name}_C"]
-        gain = torch.cholesky_solve(Ci.T,torch.linalg.cholesky(Ai)).T
-        mapping = dense[test]-gain@dense[train]
-        map_covariance = mapping@mapping.T+nu.sqrt().square()*gain@gain.T
-        expected_covariance = dense[test]@dense[test].T-cross@torch.cholesky_solve(cross.T,factor)
-        deterministic.append((map_covariance,expected_covariance))
+    chol_error = (b0-A0@exact_x).norm(dim=0)+gamma*(b0.norm(dim=0)+(A0.abs()@exact_x.abs()).norm(dim=0))
+    metrics,bounds = {},[]
+    for name,operator,bi,xi,prior_i,paths_i in (("adapter",A,rhs,x,f0[test],u),("native",N,bn,xn,native_prior,native)):
+        action = N._matmul if name == "native" else A.matmul
+        ax,ci = action(xi),C@xi
+        ri,stats,_ = residual(operator,xi,bi,action)
+        # Use common float64 A0: measured operator differences include the known native noise shift.
+        error = ri.norm(dim=0)+(bi-b0).norm(dim=0)+(ax-A0@xi).norm(dim=0)
+        error += gamma*(bi.norm(dim=0)+ax.norm(dim=0)+(A0.abs()@xi.abs()).norm(dim=0))+chol_error
+        budget = (prior_i-f[test]).norm(dim=0)+cross.norm()*error/lower+(ci-cross@xi).norm(dim=0)
+        budget += gamma*(prior_i.norm(dim=0)+f[test].norm(dim=0)+ci.norm(dim=0)+(cross.abs()@xi.abs()).norm(dim=0))
+        variance,exact_variance = paths_i.var(1,unbiased=True),exact.var(1,unbiased=True)
+        same_draw = float((variance-exact_variance).norm()/exact_variance.norm())
+        assert torch.isfinite(paths_i).all() and (variance >= 0).all() and (variance+nu > 0).all()
+        assert ((paths_i-exact).norm(dim=0) <= budget).all()
+        assert stats["max"] <= 2e-4 and stats["zero_absolute"] == 0 and same_draw <= .002
+        metrics[name] = dict(residual=stats,same_draw_l2=same_draw,path_bound_max=float(budget.max()))
         bounds.append(budget)
-        metrics[name] = dict(residual=stats,per_rhs=values.tolist(),same_draw_l2=same_draw,
-            covariance_relative=float((covariance-exact_covariance).norm()/exact_covariance.norm()),
-            path_error_max=float((paths_i-exact).abs().max()),path_norm_errors=(paths_i-exact).norm(dim=0).tolist(),
-            path_bounds=budget.tolist(),solution_error_max=float((xi-exact_x).abs().max()),
-            operator_action_difference_max=float(operator_difference.max()),rhs_difference_max=float(rhs_difference.max()),
-            iterations=len(traces[name])-1)
-        arrays.update({f"{name}_{key}":value for key,value in dict(A=Ai,C=Ci,rhs=bi,x=xi,paths=paths_i,residual=ri,map_covariance=map_covariance).items()})
-    pair_error = (u-native).norm(dim=0)
-    pair_bound = bounds[0]+bounds[1]
-    report = dict(metrics=metrics,arrays={k:v.tolist() for k,v in arrays.items()},
-        deterministic_errors=[float((a-b).abs().max()) for a,b in deterministic],
-        native_adapter_max=float((u-native).abs().max()),pair_errors=pair_error.tolist(),pair_bounds=pair_bound.tolist(),
-        noise=float(nu),squared_std_difference=float(nu.sqrt().square()-nu),rhs_strides=[list(rhs.stride()),list(bn.stride())],
-        contiguous_native_difference=float((contiguous-native).abs().max()),contiguous_adapter_difference=float((contiguous-u).abs().max()),
-        operators=[type(A).__name__,type(N).__name__],trace=[c["trace"] for c in captured],
-        cg=dict(tolerance=settings.cg_tolerance.value(),max_iter=settings.max_cg_iterations.value(),n_tridiag=0,
-            eps=1e-10,stop_updating_after=1e-10,terminate_by_size=settings.terminate_cg_by_size.on(),minimum_iterations=11),
-        lambda_lower=float(lower),gamma=gamma,gram_gamma=gram_gamma)
-    path = RUN/f"native_{label}.json"
-    assert not path.exists()
-    path.write_text(json.dumps(report,indent=2))
-    for a,b in deterministic:
-        torch.testing.assert_close(a,b,atol=1e-10,rtol=1e-9)
-    assert (pair_error <= pair_bound).all()
-    for name,paths_i,budget in zip(("adapter","native"),(u,native),bounds):
-        assert torch.isfinite(paths_i).all() and ((paths_i-exact).norm(dim=0) <= budget).all()
-        assert metrics[name]["residual"]["max"] <= 2e-4 and metrics[name]["residual"]["zero_absolute"] == 0
-        assert metrics[name]["same_draw_l2"] <= .002
-    return {k:v for k,v in report.items() if k not in ("arrays","trace")}
-
-
-def explain_native():
-    """Analyze captured arrays only; do not rerun the failed diagnostic or any sampling."""
-    source = RUN/"native_diagnostic_n36_r9_0_General_initial_s521.json"
-    saved = json.loads(source.read_text())
-    arrays = {k:torch.tensor(v,dtype=torch.float64) for k,v in saved["arrays"].items()}
-    nu = saved["noise"]
-    delta = float(torch.tensor(nu,dtype=torch.float32).double()-nu)
-    difference = arrays["native_A"]-arrays["adapter_A"]
-    torch.testing.assert_close(difference,delta*torch.eye(len(difference)),atol=1e-10,rtol=1e-9)
-    own_paths,own_errors = {},{}
-    for name in ("adapter","native"):
-        Ai,Ci,bi,xi = (arrays[f"{name}_{key}"] for key in ("A","C","rhs","x"))
-        exact_x = torch.cholesky_solve(bi,torch.linalg.cholesky(Ai))
-        prior_paths = arrays[f"{name}_paths"]+Ci@xi
-        own_paths[name] = prior_paths-Ci@exact_x
-        own_errors[name] = float((arrays[f"{name}_paths"]-own_paths[name]).abs().max())
-    observed = arrays["adapter_paths"]-arrays["native_paths"]
-    exact_difference = own_paths["adapter"]-own_paths["native"]
-    noise_only = arrays["C0"]@(torch.cholesky_solve(arrays["b0"],torch.linalg.cholesky(arrays["A0"]+delta*torch.eye(len(difference))))-arrays["exact_x"])
-    numerical_pass = all(row["residual"]["max"] <= 2e-4 and row["residual"]["zero_absolute"] == 0 and row["same_draw_l2"] <= .002 and
-        all(e <= b for e,b in zip(row["path_norm_errors"],row["path_bounds"])) for row in saved["metrics"].values())
-    numerical_pass = numerical_pass and all(e <= b for e,b in zip(saved["pair_errors"],saved["pair_bounds"]))
-    result = dict(source_sha=prior.sha(source.read_bytes()),code_sha=prior.sha(Path(__file__).read_bytes()),
-        noise=nu,noise_float32=float(np.float32(nu)),diagonal_delta=delta,
-        unexplained_operator_max=float((difference-delta*torch.eye(len(difference))).abs().max()),
-        own_exact_path_difference_max=float(exact_difference.abs().max()),own_iterative_errors=own_errors,
-        differential_iterative_error_max=float((observed-exact_difference).abs().max()),
-        noise_only_prediction_max=float(noise_only.abs().max()),noise_only_unexplained_path_max=float((observed-noise_only).abs().max()),
-        numerical_pass=numerical_pass,operator_equivalence_pass=False,decision="STOP: native float32 noise diagonal fails strict operator equivalence")
-    path = RUN/"native_explanation.json"
-    assert not path.exists()
-    path.write_text(json.dumps(result,indent=2))
-    assert numerical_pass
-    return result
+    assert ((u-native).norm(dim=0) <= bounds[0]+bounds[1]).all()
+    report = dict(metrics=metrics,deterministic_max=max(float((a-b).abs().max()) for a,b in deterministic),
+        noise=float(nu),native_noise=float(native_noise),native_adapter_max=float((u-native).abs().max()))
+    path.with_suffix(".json").write_text(json.dumps(report,indent=2))
+    return report
 
 
 def stream(graph, train, test, B, A, C, nu, arm, prefixes, seed, reference, label):
@@ -360,8 +282,8 @@ def worker(job, manifest):
             graph,train,test,y,scale,model,saved,old,identity = load(n,r,g,arm,state)
             assert identity == manifest["identities"][f"{n}_{r}_{g}_{arm}_{state}"]
             result.update(identity=identity)
-            guard = poly.sparse(n,len(train),len(test)) if mode in ("qual","diagnostic","smoke") else nullcontext()
-            reference = dense_reference(graph,train,test,y,model,arm) if mode in ("qual","diagnostic") else None
+            guard = poly.sparse(n,len(train),len(test)) if mode in ("qual","regression","smoke","audit") else nullcontext()
+            reference = dense_reference(graph,train,test,y,model,arm) if mode in ("qual","regression") else None
             if reference is not None:
                 result["reference_scores"] = poly.scores(reference[3],reference[4],y[test],model.likelihood.noise,scale)
                 np.savez(RUN/f"{tag}_reference.npz",mean=reference[3].numpy(),variance=reference[4].numpy())
@@ -369,7 +291,10 @@ def worker(job, manifest):
                     result["deterministic"] = tiny_checks(graph,train,test,model,arm,reference)
             with guard:
                 audit_path = RUN/f"audit_n{n}_r{r}_{g}_{arm}_{state}.npz"
-                if mode in ("qual","diagnostic","smoke","audit") and not audit_path.exists():
+                if mode == "smoke":
+                    assert not audit_path.exists(), "Guarded smoke audit must execute"
+                result["audit_executed"] = False
+                if mode in ("qual","regression","smoke","audit") and not audit_path.exists():
                     _,A,_,nu,_ = prepare(graph,train,test,model,arm)
                     lo,hi,audit = selected_audit(graph,train,test,model,A,nu,identity["positions"])
                     if reference is not None:
@@ -378,6 +303,7 @@ def worker(job, manifest):
                         assert (lo <= v+tolerance).all() and (v <= hi+tolerance).all(), "Dense variance outside bracket"
                     np.savez(audit_path,lower=lo.numpy(),upper=hi.numpy())
                     audit_path.with_suffix(".json").write_text(json.dumps(dict(identity=identity,sha=prior.sha(audit_path.read_bytes()),audit=audit),indent=2))
+                    result["audit_executed"] = True
                 else:
                     audit_info = json.loads(audit_path.with_suffix(".json").read_text())
                     assert audit_info["identity"] == identity and audit_info["sha"] == prior.sha(audit_path.read_bytes())
@@ -428,5 +354,5 @@ if __name__ == "__main__":
     manifest = json.loads((RUN/"manifest.json").read_text())
     assert all(prior.sha(Path(p).read_bytes()) == h for p,h in manifest["sources"].items())
     job = json.loads(sys.argv[1])
-    assert job in manifest["diagnostic"]+manifest["qualification"]+manifest.get("final",[])
+    assert job in manifest["regression"]+manifest["qualification"]+manifest.get("final",[])
     worker(job,manifest)
