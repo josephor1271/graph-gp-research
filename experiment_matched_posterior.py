@@ -21,7 +21,7 @@ import experiment_learned_kernel_scaling_final as fitted
 from grf_gp.inference import pathwise_conditioning
 
 OUT = Path(__file__).resolve().parent/"results/matched_posterior_scaling"
-RUN = OUT/"matched"
+RUN = OUT/"extended"
 SEEDS = (521,522,523)
 
 
@@ -272,7 +272,7 @@ def stream(graph, train, test, B, A, C, nu, arm, prefixes, seed, reference, labe
 
 def worker(job, manifest):
     mode,n,r,g,arm,state,seed,P = job
-    tag = f"{mode}_n{n}_r{r}_{g}_{arm}_{state}_s{seed}"
+    tag = f"{mode}_n{n}_r{r}_{g}_{arm}_{state}_s{seed}_p{P}"
     output = RUN/f"{tag}.json"
     assert not output.exists(), "Preserve prior attempts"
     result = dict(job=job,status="failed",rows=[])
@@ -314,8 +314,8 @@ def worker(job, manifest):
                 if mode == "audit":
                     result["status"] = "complete"
                 else:
-                    seeds = SEEDS if mode == "qual" and n == 1000 and arm == "General" else (seed,)
-                    prefixes = (512,1024) if mode == "qual" and n == 1000 else (P,)
+                    seeds = SEEDS if mode == "qual" and n == 1000 else (seed,)
+                    prefixes = (P,)
                     for stream_seed in seeds:
                         B,A,C,nu,prep_s = prepare(graph,train,test,model,arm)
                         start = perf_counter()

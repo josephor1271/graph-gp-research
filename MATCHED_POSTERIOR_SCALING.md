@@ -1,157 +1,180 @@
-# Matched posterior uncertainty: no common MC budget qualifies
+# Matched posterior uncertainty through 50K vertices
 
-**The amended numerical qualification passes; the frozen Monte Carlo qualification
-does not.** General passes18/24 combinations at512 paths and23/24 at1024.
-No common P* was selected. Per the original stopping rule, all144 planned
-5K–50K predictions and their designated large guarded audits remain unattempted.
-No scaling, speed, reconstructed-total or memory advantage is claimed.
+**Completed all144 cold predictions on48 existing fits.** Both methods pass all72
+of their audited latent/observation variance targets. Poly's median prediction
+phase sum is lower in all24 paired fits (TP/TG=.385–.768); the advantage narrows
+at50K. Predictive differences are small and sometimes mixed; no significance,
+statistical equivalence, universal scaling law or real-traffic claim follows.
 
-## Protocol and preserved evidence
+## Frozen protocol and qualification
 
-The benchmark method is **official GeneralGRF features with a batched float64
-posterior inference adapter**, compared with our existing Poly root. It is not
-unmodified native prediction. Both use their own fitted covariance K=BB^T,
-analytic-form iterative mean and centered paths with conditioning noise once;
-unbiased streaming variance adds observation noise once for scoring.
-CPU float64/four threads, width32, CG1e-4/max1000/no preconditioner/n_tridiag0;
-no training, kernel, solver, seed or dependency changes. No SLQ for prediction.
-PR16 n1000/r10,11 weighted normalized graphs use train/test250 each and training-only
-normalization: H covariance exp(−1.5L), M .5exp(−1.5L)+.5(L/2)², raw noise variance.1.
+The planner-authorized menu extension was frozen before execution:2048, then4096
+only if needed. At2048, **Poly24/24 and General24/24** prescribed n1000
+state/stream combinations pass both latent L2<=10% and observation L2<=5% targets.
+Worst latent/observation errors: Poly3.389%/2.535%, General3.507%/3.205%.
+All48 new numerical checks pass (same-draw Cholesky variance L2<=.002 and true
+mean/path residual<=2e-4). **4096 was not evaluated.** Prior failed General
+qualifications at512(18/24) and1024(23/24), native diagnostics, thresholds,
+manifests and source snapshots remain intact; no stress state was dropped.
 
-Main base31fd991 contains merged PR18; this continues PR19 from8a08096.
-After reviewing the two preserved failures, the planner authorized strict
-comparisons against float64 algebra for the adapter and independently verified
-float32 noise-diagonal conversion for native General. Both retain original
-atol1e-10/rtol1e-9. The adapter noise is unchanged. The residual-aware path bound
-includes measured operator/RHS differences, known noise perturbation and float64
-roundoff; residual<=2e-4 and same-draw variance L2<=.002 gates are unchanged.
-This is an explicit post-observation protocol amendment, not a relabeled pass.
+New development qualification uses both methods, r10/11, initial H/stress H/
+fitted H/fitted M and seeds521/522/523. Existing outputs lack RNG/running-moment
+checkpoints, so the unchanged seeded streams replay earlier perturbations and
+continue to2048; only the new endpoint is evaluated. No native investigation,
+training, kernel change, solver sweep or new dependency. The active driver remains
+**358 lines: four existing lines changed** for output/budget names and streams.
 
-The original7.15494e-9 path mismatch and1.84986e-8 native noise-diagonal shift,
-all old thresholds, manifests, logs, diagnostics and source snapshots remain.
-Git commits fd6febe/8a08096 retain their complete reports and one-time diagnostic
-code. All **3,653 earlier result files and the inventoried filename set** are
-unchanged. New evidence is isolated in ignored
-`results/matched_posterior_scaling/matched/`. The active driver shrank432→358
-lines by removing the one-time trace investigation and saved-array explanation.
+The final schedule was frozen immediately after selection: n5K/10K/25K/50K,
+r0/1/2,H/M,Poly/General W1024,three fresh processes per endpoint with seeds521/522/523,
+2048 paths,width32,CPU float64,four Torch threads,CG1e-4/max1000/no preconditioner.
+Actual feature/root and lazy A/C preparation is once per invocation for both arms.
+The General arm is **official GeneralGRF features with a batched float64 posterior
+inference adapter**, not unmodified native prediction. Adapter noise stays float64.
+Poly reuses its quadratic Chebyshev root (degree-four covariance); General uses
+the actual finite, potentially asymmetric Phi, K=Phi Phi^T. No SLQ in prediction.
 
-## Numerical qualification
+PR17's unchanged weighted normalized road-like graphs have train/test quarters,
+training-only normalization, H covariance exp(−1.5L), M .5exp(−1.5L)+.5(L/2)^2,
+raw noise variance.1. All48 checkpoints, data/feature fingerprints, original walk
+caches (W1024,J3,halt.5), input hashes and fitted parameters verify. No refitting
+or new walks. Model/cache state resets per process; disk caches are not flushed.
+Arm order rotates by(size_index+r+regime+stream_index)%2 in increasing size.
 
-Completed the minimal original n36/r9/H/initial General seed521 regression, then
-all11 remaining original invocations: tiny stress General, tiny Poly, one fitted
-n1000 Poly regression and eight prescribed General states on r10/11. General uses
-seeds521/522/523 and nested512/1024 prefixes; prior Poly421/422/423 support was
-verified without rerunning PR18. All **53 state/stream/prefix numerical checks**
-pass; no NumericalWarning, invalid variance, jitter/clipping or zero sampling RHS.
+## Prediction and reconstructed costs
 
-The amended tiny initial strict algebra discrepancy is<=1.111e-15. Actual native
-CG residual7.624e-6 and identical-draw variance error1.510e-7 pass. Native noise
-.6932471990585327 matches the explicitly checked float32 conversion of adapter
-noise.6932471805599453; the entire conditioning-matrix difference is that scalar
-shift times identity. The tiny stress regression also passes; no unexpected
-operator difference was accepted. Independent actual-walk covariance/full-map
-checks and streaming-vs-torch.var checks retain strict tolerances.
+Each fitted endpoint's primary time is the median of its three cold stream phase
+sums. Table centers are medians across r0/1/2; brackets span those three endpoint
+medians. Paired TP/TG is computed per r, then summarized, not divided group centers.
+H/M share graph/noise/split; MC streams are not independent data replicates.
+All individual timings, phase costs and ranges are retained in the local CSVs.
 
-| Maximum across completed checks | Measured | Gate |
-|---|---:|---:|
-| Sampling true per-RHS relative residual | 1.41524e-4 | 2e-4 |
-| Mean true residual | 8.98123e-5 | 2e-4 |
-| Mean max abs / relative L2 discrepancy | 1.81653e-4 / 8.06705e-5 | max abs .002 |
-| Variance L2 vs identical-draw Cholesky | 6.12939e-6 | .002 |
-| Selected-column relative bracket width | 8.00406e-6 | .002 |
-
-All12 selected-column audits executed under guards, with positive lower bounds
-and independent dense containment to the original roundoff tolerance. Their
-maximum true reference residual was8.63342e-4: the oracle's prescribed acceptance
-uses finite residuals and verified bracket width, rather than assuming requested
-CG tolerance is a per-column guarantee. This does not relax the mean/path gates.
-These are tiny/n1000 audits, not evidence that large guarded audits executed.
-
-## Frozen MC decision
-
-Each row below covers two development graphs × three streams, with their own
-analytic finite-kernel posterior as reference. H/M share data; streams/prefixes
-are not independent datasets. Targets: latent L2<=10%, observation L2<=5%.
-Times are measured preparation+mean+paths+streaming moments; no projections.
-
-| General state | P | Latent error % range | Observation error % range | Joint passes | Prediction ms range |
+|N/regime|Poly prediction s [range]|General prediction s [range]|Paired TP/TG [range]|Standalone s P/G|Amortized General s|
 |---|---:|---:|---:|---:|---:|
-|initial H|512|5.93–6.81|3.00–3.36|6/6|508.7–622.2|
-|initial H|1024|3.98–4.59|2.01–2.30|6/6|987.2–1115.8|
-|stress H|512|5.71–7.09|5.24–6.48|0/6|843.1–1006.6|
-|stress H|1024|4.07–5.59|3.73–5.11|5/6|1694.7–1895.7|
-|fitted H|512|6.00–6.91|2.73–4.17|6/6|494.9–648.6|
-|fitted H|1024|4.06–4.73|1.88–3.07|6/6|1000.7–1198.7|
-|fitted M|512|5.55–6.88|0.67–1.43|6/6|503.4–628.7|
-|fitted M|1024|3.93–4.78|0.47–0.99|6/6|1009.2–1145.6|
+|5K/H|3.755[3.139,3.867]|9.747[6.571,9.750]|.397[.385,.478]|8.917/24.417|22.049|
+|5K/M|4.299[4.177,4.476]|8.985[8.781,9.012]|.478[.464,.510]|9.499/23.745|21.313|
+|10K/H|4.962[4.959,5.414]|9.748[9.707,9.871]|.511[.509,.549]|16.725/41.023|35.951|
+|10K/M|5.005[5.001,5.046]|9.664[9.599,9.686]|.521[.518,.521]|16.661/41.205|35.899|
+|25K/H|13.722[13.716,25.897]|25.869[25.013,48.590]|.533[.530,.548]|45.417/109.741|95.890|
+|25K/M|13.741[13.520,28.644]|25.985[24.746,56.415]|.529[.508,.546]|45.507/109.556|95.705|
+|50K/H|50.111[47.786,50.216]|65.248[65.233,65.728]|.764[.733,.768]|110.156/198.793|169.015|
+|50K/M|47.997[47.992,48.196]|65.770[65.115,66.113]|.730[.729,.737]|107.824/198.938|169.134|
 
-Latent gates pass24/24 at both budgets; observation/joint counts are18/24 and
-23/24. Prior Poly supports24/24 at each budget and its new regression passes,
-but the common rule requires **all24 General combinations**, including stress.
-We did not discard the stress control because fitted states passed.
+All24 pairs meet the audited accuracy targets in all three streams. Their
+standalone cost ratios span.364–.558; amortized ratios.403–.656. Standalone=
+PR17 setup+original fresh walk+training+new prediction phases, **replacing** old
+mean-only time. This sums historical and new measurements on the same hardware/
+software, not a freshly timed end-to-end execution. Each General standalone fit
+is charged its original walk fully; amortized excludes that walk. Poly has zero
+walk cost, so its amortized total equals standalone. Shared graph/data excluded.
 
-The sole1024 miss is **r10/H/stress/seed522**: latent5.594369%, observation
-**5.111535%**. Its true sampling residual1.33018e-4 and same-draw variance
-error2.75251e-6 pass. Exact Cholesky conditioning of those identical perturbations
-still gives observation error **5.111562%**. This is finite-sample MC error,
-not an inference defect cured by tighter CG. Stress uses prescribed modulation
-[1.5,−3.225,1.35], noise variance.05; no state or seed was retuned.
-Aggregate error is not pointwise: worst1024 latent/observation node errors are
-18.42%/15.09%, and worst per-state p95 errors9.82%/8.12%.
+Prediction phases measure feature/root/block preparation, analytic mean,
+random/root/CG/correction batches and streaming moments. Residual audits,
+selected-column references, loading/hashing, guards, scoring and I/O are excluded.
+Initial generator/running-moment-vector setup and Python orchestration are also
+outside these phase timers; inclusive worker wall is retained separately. Audit
+products interleave batches and can warm caches. Thus phase sums are not complete
+API wall latency. Raw stream timings span2.916–58.547s Poly and6.565–108.432s
+General; substantial timing variation is retained, including the25K outliers.
+No slope is fitted or speed inferred for unmeasured graphs/settings.
 
-## Predictive scores, costs and limitations
+## Variance fidelity and predictive scores
 
-General1024 sampled scores below range over the same six combinations per state.
-RMSE uses the analytic-form iterative mean, not sample mean; NLPD is marginal
-**observation** NLPD. Exact stress coverage is only72.4–73.2% at nominal95%, so
-numerical fidelity does not establish calibration of this deliberately fixed state.
+All48 selected-column audits actually executed under guards:8 mandatory fresh
+r0/H mean+32-path smokes plus40 other endpoint audits. Smoke rejects an existing
+audit cache. Each endpoint's reference is reused only for its three predictions.
+The fixed256 held-out positions (seed891000+n+100000r) are shared across methods/
+regimes and frozen before outcomes. Local basis products, not full covariance or
+Poly diagonal/exact-entry fallback, supply the actual finite-kernel reference.
 
-| State | Raw RMSE | Raw NLPD | 95% observation coverage |
+Positive residual brackets use upper=d−c^T x−x^T r and lower=upper−||r||²/nu.
+All selected widths pass; maximum relative width **1.31609e-10**, maximum true
+reference-column residual9.99221e-6. Aggregate comparisons use the prescribed
+conservative triangle bounds against these intervals, on audited nodes only;
+float arithmetic is not a formal certified enclosure or whole-test guarantee.
+
+|Maximum across72 final streams per arm|Poly|General|Target|
 |---|---:|---:|---:|
-|initial H|.561338–.598339|.868882–.948074|.980–.984|
-|stress H|.626936–.681073|1.537898–1.625768|.716–.736|
-|fitted H|.554718–.585408|.829337–.895974|.944–.964|
-|fitted M|.575216–.599359|.869220–.908872|.972–.976|
+|Latent relative L2 bound|3.4124%|3.4845%|10%|
+|Observation relative L2 bound|2.1620%|1.9586%|5%|
+|Worst latent node / per-fit p95 error|14.07%/6.85%|13.68%/7.23%|no pointwise gate|
+|Worst observation node / per-fit p95 error|7.29%/4.53%|7.54%/3.82%|no pointwise gate|
 
-All normalized/raw scores, observation SDs/interval widths, exact references,
-per-node variances and residuals remain in CSV/JSON/NPZ. Raw variance multiplies
-by scale²; raw NLPD adds log(scale), with training-only normalization.
-Qualification attempt wall totals71.454s, max9.112s; sampled process-group peak
-515.70MiB includes imports, dense references and guards. Candidate phase timers
-exclude references/residual audits/scoring/I/O, but include guard overhead and
-library warmup. These development timings/RSS do not support a fair large-scale
-speed or memory claim. No1800s/case,4h total or12GiB cap was hit.
-Only two previously seen development datasets and fixed states were checked;
-no large uncertainty, statistical significance, population calibration or universal
-sample-budget guarantee follows. All144 final outcomes are explicitly unattempted
-(36 each at5K/10K/25K/50K); no final schedule was activated or budget increased.
+Maximum true mean/path residuals are8.94885e-6/1.04103e-5; means match saved PR17
+means bit-for-bit (these saved references are iterative, not dense large solves).
+No NumericalWarning, invalid variance, jitter/clipping or numerical failure.
+Gaussian scoring uses the analytic-form iterative mean and sample latent variance
+plus observation noise once; no finite-sample mean for RMSE. Below: means across
+three independent graph/data replicates of endpoint medians over streams, P/G.
+NLPD is **marginal observation** NLPD; variances scale by training scale² and
+NLPD_raw=NLPD_normalized+log(scale). Normalized scores and mean95% widths
+(3.919928×mean SD), all raw vectors and stream values remain in CSV/NPZ.
 
-## Reproduction and verification
+|N/regime|Raw RMSE P/G|Raw NLPD P/G|95% coverage % P/G|Mean observation SD P/G|
+|---|---:|---:|---:|---:|
+|5K/H|.615702/.615558|.932777/.937338|94.37/94.45|.6052/.6093|
+|5K/M|.644206/.644363|.980097/.981975|94.29/94.40|.6322/.6333|
+|10K/H|.608023/.609091|.921519/.924676|94.47/94.35|.6014/.6049|
+|10K/M|.622117/.622832|.944503/.945826|94.97/95.04|.6249/.6249|
+|25K/H|.608565/.609663|.921373/.925308|94.91/94.84|.6071/.6104|
+|25K/M|.634939/.635190|.964681/.965289|94.93/94.88|.6344/.6345|
+|50K/H|.604998/.605613|.915597/.918347|94.89/94.95|.6034/.6078|
+|50K/M|.634946/.634999|.964736/.964967|94.90/94.90|.6323/.6323|
 
-Retained local evidence includes `amendment.md`, frozen `manifest.json`,
-`selection.json`, `rows.csv` (all53 checks), `summary.json`, per-case arrays/logs,
-resource records, `unattempted_final.csv` and preservation hashes. Metadata-only
-local launch/table scripts contain no additional inference or solver methods.
-Exact execution used the retained watchdog with phases `regression` then
-`qualification`; it checks failed JSON status, not only process exit code:
+Poly's mean NLPD is lower in every size/regime group, but some individual large-M
+pairs favor General. General has slightly lower mean5K/H RMSE. Paired raw RMSE
+P−G ranges−.001802 to+.001015; NLPD differences−.006721 to+.000258; coverage
+differences−.36 to+.40 percentage points. These descriptive differences do not
+establish significance or noninferiority. Own-kernel numerical fidelity does not
+make the two posterior variances equal or establish population calibration,
+hyperparameter uncertainty, joint predictive density or transfer to real graphs.
+
+## Memory, resources, preservation and reproduction
+
+One-second sampled process-group peak RSS ranges across18 primary workers/arm/size:
+
+|N|Poly MiB|General MiB|
+|---|---:|---:|
+|5K|396.5–510.9|456.7–518.5|
+|10K|492.9–549.2|497.8–560.5|
+|25K|626.0–767.4|655.1–813.7|
+|50K|633.9–659.5|685.7–825.2|
+
+These fresh-process measurements include imports, checkpoint/data loading/hash
+verification, inference, scoring and output; dense references run separately.
+Sampling may miss peaks/double-count shared pages; nonmonotonic values do not
+identify exact tensor memory or an asymptotic memory law. Final worker wall sums
+4581.370s (max121.018s); primary phase sums3545.722s; reference audits152.492s.
+All192 final jobs completed; no failed/skipped final case or resource violation
+(1800s/case,4h total,12GiB sampled RSS). Safe MC misses would have continued;
+actual final misses are **0/144**. One local preparer import-path error was fixed
+before any case ran; its logs remain, and no experiment case was retried.
+
+All **3,805 prior result files and their inventoried filename set** are unchanged.
+Qualification and final manifests, source/package/input hashes, old failures,
+selection,192 outcomes,144 prediction rows,48 endpoint medians,24 paired ratios,
+48 audit rows, warnings, resources and vectors remain local/ignored under
+`results/matched_posterior_scaling/extended/`. Two figures (`runtime.png`,
+`uncertainty_cost.png`) reproduce from the measured CSVs; shaded runtime ranges
+are data-replicate ranges, not confidence intervals. Numerical logic remains in
+the tracked driver; local table/plot/watchdog scripts only handle presentation,
+metadata and resources. Reproduction needs the retained ignored prerequisites;
+fresh clones alone lack checkpoints/walks. Commands refuse to overwrite attempts.
 
 ```sh
-caffeinate -i results/traffic_env/bin/python -u results/matched_posterior_scaling/matched/launch_local.py regression
-caffeinate -i results/traffic_env/bin/python -u results/matched_posterior_scaling/matched/launch_local.py qualification
-cat results/matched_posterior_scaling/matched/selection.json
-results/traffic_env/bin/python -m unittest discover -s tests -v
-.venv/bin/python -m unittest discover -s tests -v
-git diff --check
+results/traffic_env/bin/python results/matched_posterior_scaling/extended/freeze_local.py
+caffeinate -i results/traffic_env/bin/python -u results/matched_posterior_scaling/extended/launch_local.py qualification2048
+results/traffic_env/bin/python results/matched_posterior_scaling/extended/freeze_final_local.py
+caffeinate -i results/traffic_env/bin/python -u results/matched_posterior_scaling/extended/launch_local.py final
+results/traffic_env/bin/python results/matched_posterior_scaling/extended/tables_local.py
+results/traffic_env/bin/python results/matched_posterior_scaling/extended/plots_local.py
 ```
 
-Commands refuse to overwrite attempts; replay requires an isolated copy with the
-frozen prerequisites and clean new output. A fresh clone lacks ignored inputs.
-Unchanged Apple M4/16GiB, CPU float64/four threads; Torch2.11.0, GPyTorch1.15.2,
-linear_operator0.6.1, NumPy1.26.4, SciPy1.17.1. Clean pinned upstream commits:
-Fast-Graph-GP268fff9a3724cdd480dce4b2946068d8211b4f30 and authors' experiments
-274b7ee393ee516585552f053e9d4a9c6ad2222f. All60 frozen identities/packages verify.
-Baseline/final tests:9/9 in both environments, with the same three existing
-strict-CG NumericalWarnings per suite; py_compile/diff checks pass.
-Changed: existing driver/report only; deleted: one-time diagnostic code;
-kept: kernels, training, dependencies and all earlier evidence. Open issue:
-no budget satisfies the frozen all-case rule; further research needs planner review.
+Same Apple M4/16GiB/macOS26.6.2; Torch2.11.0,GPyTorch1.15.2,linear_operator0.6.1,
+NumPy1.26.4,SciPy1.17.1. Clean Fast-Graph-GP pin268fff9a3724cdd480dce4b2946068d8211b4f30;
+authors' experiments274b7ee393ee516585552f053e9d4a9c6ad2222f. Base dceed47,
+main31fd991; all original identities and newly required Poly states verify.
+Existing unittest suites pass9/9 before/after in both environments (same three
+pre-existing strict-CG NumericalWarnings per suite); py_compile/diff checks pass.
+Changed: four driver lines and this report; deleted:nothing; kept: kernels,
+training, inference settings, dependencies and all earlier evidence. Stop for
+planner review; no further budget, dataset, solver or scaling experiment.
