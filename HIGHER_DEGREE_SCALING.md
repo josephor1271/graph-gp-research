@@ -1,6 +1,6 @@
 # Degree-four polynomial and GeneralGRF scaling
 
-**Poly4 retained a cost advantage in all six completed 5K pairs.** Its standalone cost was 35–47% of J5’s, with relative RMSE differences between −0.10% and +0.61%. Its advantage did not increase in the historical group-median comparison. A wall-time stop leaves the 25K/50K decision unresolved.
+**Poly4 retained a cost advantage in all six completed 5K pairs.** Its standalone cost was 35–47% of J5’s, with relative RMSE differences between −0.10% and +0.61%. Its advantage did not increase in the historical group-median comparison. The timing audit qualified all 12 original 5K fits. A fresh 25K H pair also favored Poly4 in time, with raw RMSE 0.00030 higher. A second clamshell sleep stopped the continuation before the larger-size decision could be evaluated.
 
 ## Matched models and frozen comparison
 
@@ -90,13 +90,17 @@ Medians [range] over the available graph replicates. Times in seconds and RSS in
 |5000 / H|Poly|3|0 [0, 0]|100.1 [95.34, 104.9]|0.03698 [0.03615, 0.0424]|700.3 [620.8, 745.8]|0.6164 [0.6154, 0.6167]|
 |5000 / M|General|3|27.59 [25.59, 29.45]|194.3 [190.7, 195.4]|0.2396 [0.2371, 0.2423]|689.9 [641, 704.9]|0.6473 [0.638, 0.65]|
 |5000 / M|Poly|3|0 [0, 0]|91.11 [77.58, 91.63]|0.03742 [0.03596, 0.03802]|658.3 [641.7, 760.7]|0.6472 [0.6418, 0.6509]|
+|25000 / H|General|1|141.2 [141.2, 141.2]|1028 [1028, 1028]|1.195 [1.195, 1.195]|1047 [1047, 1047]|0.6063 [0.6063, 0.6063]|
+|25000 / H|Poly|1|0 [0, 0]|535.1 [535.1, 535.1]|0.1959 [0.1959, 0.1959]|944.4 [944.4, 944.4]|0.6066 [0.6066, 0.6066]|
 
 |N / regime|Pairs|Poly4/J5 standalone|Poly4/J5 reused|RMSE P−G|RMSE P/G|Standalone advantage change¹|
 |---|---|---|---|---|---|---|
 |5000 / H|3|0.4361 [0.4347, 0.4657]|0.4999 [0.4917, 0.5307]|0.0008857 [-0.0005898, 0.001495]|1.001 [0.999, 1.002]|0.8052 [0.7525, 0.8069]|
 |5000 / M|3|0.4102 [0.3488, 0.422]|0.472 [0.3978, 0.4783]|0.0009153 [-0.0001027, 0.00388]|1.001 [0.9998, 1.006]|0.8574 [0.8327, 1.003]|
+|25000 / H|1|0.4576 [0.4576, 0.4576]|0.5203 [0.5203, 0.5203]|0.0002977 [0.0002977, 0.0002977]|1 [1, 1]|0.8255 [0.8255, 0.8255]|
 
 ¹ Paired (J5/Poly4) divided by historical (J3/Poly2). Historical PR17 used W1024 and 32/16. This comparison changes the whole inference/feature configuration.
+
 ## Matched outcomes by graph
 
 Times are standalone / reused-walk seconds. Historical columns are within-dataset new/old standalone time and raw RMSE change (new minus old). Blank arms were outside the completed allocation.
@@ -109,6 +113,7 @@ Times are standalone / reused-walk seconds. Historical columns are within-datase
 |5000 / 1 / M|91.73 / 91.73|217.39 / 191.79|0.641840 / 0.637960|17.49× / +0.004259|14.56× / -0.000588|
 |5000 / 2 / H|100.71 / 100.71|230.92 / 201.47|0.616447 / 0.617036|19.33× / +0.000224|15.60× / +0.000261|
 |5000 / 2 / M|92.23 / 92.23|224.86 / 195.40|0.647161 / 0.647264|17.70× / +0.000583|15.18× / +0.000533|
+|25000 / 0 / H|535.91 / 535.91|1171.27 / 1030.08|0.606631 / 0.606334|16.88× / +0.000464|13.94× / -0.000423|
 
 ## Interpretation and resource stop
 
@@ -125,7 +130,7 @@ The separate guarded fresh update and mean passed at 5K r0/H for both arms (resi
 The guard intercepts selected dense shapes, Cholesky, and polynomial exact-entry/diagonal fallback. It cannot
 certify every allocation. Maximum true residual over the 12 completed production fits was 9.24e−6.
 
-Of 36 scheduled final fits, 12 completed, one was interrupted, and 23 were unattempted. The interrupted
+At the original stop, of 36 scheduled final fits, 12 completed, one was interrupted, and 23 were unattempted. The interrupted
 25K r0/H J5 job generated its official feature cache in 141.18 s, with 25,000 / 129,294 / 340,858 /
 656,942 / 901,232 entries at lengths 0–4. The watchdog exited after the two-hour allocation deadline.
 Its last two samples were 1,516 and 5,358 wall seconds into the invocation. The 3,842-second gap prevents
@@ -134,8 +139,24 @@ the precise deadline. Sampled peak for this job was 1,122 MiB. The cache survive
 training time, checkpoint, RMSE or usable matched 25K pair. All 50K fits and guards remained unattempted.
 We preserved the original order and stopped. Sizes with missing endpoints supply no speed or accuracy estimate.
 
-The local cost-versus-size and RMSE-versus-cost figures show the single completed size with historical points.
-No scaling trend, equivalence or statistical significance can be inferred from these six pairs.
+## Timing-integrity audit and continuation
+
+All 12 original 5K timings are retained. Their one-second watchdog records span 83–235 s per process; the largest recorded interval was 2 s in every case (integer wall seconds). The last sample exceeds the internal worker timer by 3.4–4.5 s, consistent with interpreter startup and shutdown. Actual phases sum to within 0.08–3.29 s of worker wall time when walk generation is counted only in its generating job. The two largest remainders belong to the two guarded jobs. The records contain no concurrent benchmark jobs. Host-wide competing CPU, thermal pressure, and frequency were not recorded continuously, so residual timing variation remains in the comparison.
+
+The 5K runs finished by 17:28 EST on November 18. macOS recorded clamshell sleep at 17:41:51, followed by maintenance sleeps, including 3,844 s beginning at 17:53:26. This is consistent with the 3,842 s gap in the interrupted worker’s watchdog. The 25K/r0 J5 cache had already closed at 17:30:38, approximately 145 s after worker launch. Generation took 141.18 s and the pre-cache samples show no prolonged gap. Its SHA-256 is `daeb6c5d0bde01c3544e5fa224f789b726a218764a0c173fba09612dd80423fd`; five finite float64 25K-square CSR matrices matched their recorded nonzero counts. The frozen code used W4096, J5, seed 796000, four workers and halt probability 0.5. We retain the generation timing and charge it in standalone cost for both regimes.
+
+At 5K the median **training** times across the six fits per arm changed from 4.92 to 93.48 s for Poly and from 11.99 to 194.86 s for General. Median J5 walk generation was 27.59 s versus 2.37 s for J3. Median mean predictions changed from 0.010 to 0.037 s and from 0.035 to 0.240 s respectively. Most extra wall time was spent in the 100 training updates. The new configuration used 128 stochastic trace probes versus 32, a Lanczos cap of 24 versus 16, eight polynomial recurrence products versus four, and broader J5 feature support with four times the walks. Prediction uses no trace probes. The new driver also records each gradient norm. These measurements locate the extra cost by phase; they cannot apportion it among degree, probe count, conditioning, walk budget or system conditions. PR17 timings were historical.
+
+The planner authorized one fresh retry of 25K/r0/H J5, followed by the remaining frozen order. The separate allocations were four hours for 25K and six for 50K, with an unchanged 1,800 s and 12 GiB per job. A caffeinate-protected launcher recorded elapsed wall time, group RSS and sampled CPU and stopped at a sampling interval over 5 s, frozen before the retry. The first attempt and its logs remain intact. The continuation launcher and logs are in `results/higher_degree_scaling/continuation/`.
+
+### Continuation outcome
+
+The 25K/r0/H retry initialized all parameters and optimizer state afresh. Its J5 worker took 1,036.07 s with a 1.24 s maximum sampling interval and peak 1,047 MiB; the paired Poly4 worker took 541.13 s with a 1.72 s maximum interval and peak 944 MiB. Poly4 used 45.76% of J5 standalone time and 52.03% with cached walks. Raw RMSE was 0.606631 versus 0.606334. The standalone advantage change versus PR17 was 0.8255 on this single dataset. The two valid 25K timings exclude the interrupted attempt. Standalone cost includes the validated original generation time once.
+
+The next frozen job was 25K/r0/M Poly4. At 21:20:41 EST macOS recorded a 75 s clamshell sleep despite the idle-sleep assertion. Elapsed samples jumped from 83.821 to 157.547 s. The watchdog terminated the process on wake (SIGTERM). No completed model or RMSE exists for that job. The 25K allocation used approximately 28.9 minutes; the 50K allocation never started. Across the 36 unique scheduled fits there are 14 complete, one interrupted, and 21 unattempted. The prior interrupted attempt on the subsequently completed H/J5 job remains separately documented.
+
+The preregistered criterion requires three matched replicates in both regimes at both 25K and 50K. Only one 25K/H pair is available. Its favorable cost and small RMSE difference cannot settle that criterion. The refreshed local figures in `continuation/cost.png` and `continuation/rmse-cost.png` show the six 5K pairs and the single 25K/H pair. Historical markers cover the same completed datasets. All 14 raw RMSEs were recomputed from saved means. All 140 original PR22 files and the 766 earlier historical artifacts passed their post-continuation hash checks. Both existing suites again passed 9/9 with their three known strict-CG warnings each. The only tracked change in this continuation is this report.
+
 ## Reproduction and limitations
 
 Base `3ce520d1fd3d8031759518e1372216ff6348935c` includes merged PR21. Clean upstream pins were
@@ -168,9 +189,11 @@ shared pages repeatedly. Historical PR17 timings were recorded separately on the
 The development pass took approximately 354 wall seconds, sampled peak 772 MiB. Compact records include
 per-case seed/parameters, all losses, numerical trials and gradients. Final checkpoint and result hashes and
 all 36 statuses are in `outcomes.json`; selection SHA-256 starts `878a471c0e174d55`, source/input freeze
-`698a17ea2ea1c014`. We recomputed all twelve completed RMSEs from saved means and verified the historical
+`698a17ea2ea1c014`. In the original run we recomputed all twelve then-completed RMSEs from saved means and verified the historical
 input/checkpoint hashes and cached walk timings. All 766 historical artifact filenames and file hashes matched
 the before-run inventory. Both environments passed all nine tests before and after, each retaining three
 existing strict-CG NumericalWarnings. No experimental NumericalWarning was observed. Logs preserve Torch CSR
 beta/invariant and storage/sparse-constructor deprecation UserWarnings. Compilation and diff checks passed.
 Added the 200-line driver and this report. No prior file was modified or deleted.
+
+The actual continuation command was `caffeinate -is results/traffic_env/bin/python -u results/higher_degree_scaling/continuation/launch.py`. The launcher refuses a second allocation file or an existing job output. Per-attempt logs, sampled timestamps, exit status, outcomes and paired tables are retained beside it.
