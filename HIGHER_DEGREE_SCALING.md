@@ -1,6 +1,8 @@
 # Degree-four polynomial and GeneralGRF scaling
 
-**Poly4 retained a cost advantage in all six completed 5K pairs.** Its standalone cost was 35–47% of J5’s, with relative RMSE differences between −0.10% and +0.61%. Its advantage did not increase in the historical group-median comparison. The timing audit qualified all 12 original 5K fits. A fresh 25K H pair also favored Poly4 in time, with raw RMSE 0.00030 higher. A second clamshell sleep stopped the continuation before the larger-size decision could be evaluated.
+**Campaign terminated. The final analysis covers 14 of 36 scheduled fits, forming seven planner-accepted matched pairs:** six at 5K and one at 25K (r0/H). Poly4 was faster than J5 in all seven, both with walk generation charged and with features reused. At 5K its standalone time was 35–47% of J5’s. In the 25K pair it used 45.76% of J5’s standalone time, with raw RMSE 0.606631 versus 0.606334.
+
+Higher degree did not consistently improve synthetic prediction. Poly4 had lower RMSE than historical Poly2 in only one of the seven comparisons. PR17 also used different trace, Lanczos and GeneralGRF walk budgets, so the historical comparison cannot isolate the effect of polynomial degree. **The original advancement criterion remains unevaluated.** There are no measured 50K endpoints, and these results support neither a 50K extrapolation nor an asymptotic scaling claim.
 
 ## Matched models and frozen comparison
 
@@ -153,9 +155,15 @@ The planner authorized one fresh retry of 25K/r0/H J5, followed by the remaining
 
 The 25K/r0/H retry initialized all parameters and optimizer state afresh. Its J5 worker took 1,036.07 s with a 1.24 s maximum sampling interval and peak 1,047 MiB; the paired Poly4 worker took 541.13 s with a 1.72 s maximum interval and peak 944 MiB. Poly4 used 45.76% of J5 standalone time and 52.03% with cached walks. Raw RMSE was 0.606631 versus 0.606334. The standalone advantage change versus PR17 was 0.8255 on this single dataset. The two valid 25K timings exclude the interrupted attempt. Standalone cost includes the validated original generation time once.
 
-The next frozen job was 25K/r0/M Poly4. At 21:20:41 EST macOS recorded a 75 s clamshell sleep despite the idle-sleep assertion. Elapsed samples jumped from 83.821 to 157.547 s. The watchdog terminated the process on wake (SIGTERM). No completed model or RMSE exists for that job. The 25K allocation used approximately 28.9 minutes; the 50K allocation never started. Across the 36 unique scheduled fits there are 14 complete, one interrupted, and 21 unattempted. The prior interrupted attempt on the subsequently completed H/J5 job remains separately documented.
+The next frozen job was 25K/r0/M Poly4. At 21:20:41 EST macOS recorded a 75 s clamshell sleep despite the idle-sleep assertion. Elapsed samples jumped from 83.821 to 157.547 s. The watchdog terminated the process on wake (SIGTERM). No completed model or RMSE exists for that job. The 25K allocation used approximately 28.9 minutes; the 50K allocation never started. At this review cutoff, 14 of the 36 unique scheduled fits had completed, one was interrupted, and 21 were unattempted. The prior interrupted attempt on the subsequently completed H/J5 job remains separately documented.
 
 The preregistered criterion requires three matched replicates in both regimes at both 25K and 50K. Only one 25K/H pair is available. Its favorable cost and small RMSE difference cannot settle that criterion. The refreshed local figures in `continuation/cost.png` and `continuation/rmse-cost.png` show the six 5K pairs and the single 25K/H pair. Historical markers cover the same completed datasets. All 14 raw RMSEs were recomputed from saved means. All 140 original PR22 files and the 766 earlier historical artifacts passed their post-continuation hash checks. Both existing suites again passed 9/9 with their three known strict-CG warnings each. The only tracked change in this continuation is this report.
+
+### Final disposition
+
+The planner ended the campaign because the scientific value of further synthetic fits did not justify their cost. The tables, figures and conclusions use the 14-fit cutoff recorded in `continuation/outcomes.json`. For execution provenance, a later authorized session completed three additional 25K fits (r0/M Poly4 and J5, and r1/H Poly4) before the user stopped r1/H J5. Thus 17 completed checkpoints exist on disk. The three later completions remain archived outside the planner-accepted comparison; this cutoff follows the review decision and uses no timing or accuracy filter. The interrupted attempts, their watchdog logs and both continuation histories remain preserved.
+
+At closure both existing environments passed all nine tests. The source and artifact manifests from qualification and both continuations verified, including all 766 historical files and the result and checkpoint hashes for the 14 accepted fits. Finalization changed only this report.
 
 ## Reproduction and limitations
 
